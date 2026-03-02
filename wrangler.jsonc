@@ -13,7 +13,7 @@
   },
   "upload_source_maps": true,
   "vars": {
-    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_xxxx"
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_c2hpbmluZy13aGFsZS05Ni5jbGVyay5hY2NvdW50cy5kZXYk"
   },
   "d1_databases": [
     {
