@@ -1,18 +1,25 @@
 {
-	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "crashagain",
-	"main": ".open-next/worker.js",
-	"compatibility_date": "2025-10-08",
-	"compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
-	"assets": {
-		"binding": "ASSETS",
-		"directory": ".open-next/assets"
-	},
-	"observability": {
-		"enabled": true
-	},
-	"upload_source_maps": true,
-	"vars": {
-		"NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_c2hpbmluZy13aGFsZS05Ni5jbGVyay5hY2NvdW50cy5kZXYk"
-	}
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "crashagain",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-10-08",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": ".open-next/assets"
+  },
+  "observability": {
+    "enabled": true
+  },
+  "upload_source_maps": true,
+  "vars": {
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_xxxx"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "crash-card-prod-db",
+      "database_id": "5a26386c-d5ed-4b62-abc2-ebcdb28df137"
+    }
+  ]
 }

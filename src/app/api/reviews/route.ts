@@ -3,16 +3,17 @@ export const runtime = 'nodejs';
 import { NextRequest, NextResponse } from "next/server";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 
+import { getCloudflareContext } from '@opennextjs/cloudflare';
+
 function getDB() {
   if (process.env.NODE_ENV === 'development') {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const Database = require('better-sqlite3');
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const path = require('path');
     return new Database(path.join(process.cwd(), 'local.db'));
   }
   // Production — Cloudflare D1
-  return (globalThis as any).env?.DB ?? (process.env as any).DB;
+  const { env } = getCloudflareContext();
+  return env.DB;
 }
 
 // GET reviews for a product — public
