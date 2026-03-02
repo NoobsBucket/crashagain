@@ -1,4 +1,6 @@
+export const runtime = 'edge';
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+
 import { NextResponse } from 'next/server';
 
 const ADMIN_EMAILS = ["nbdotwork@gmail.com", "msdotxd1@gmail.com" ,"halayjan18@gmail.com"];
