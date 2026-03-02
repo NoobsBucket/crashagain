@@ -4,18 +4,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 function getDB() {
-  if (process.env.NODE_ENV === "development") {
-    const Database = require("better-sqlite3");
-    const path = require("path");
-    return new Database(path.join(process.cwd(), "local.db"));
-  }
   const { env } = getCloudflareContext();
   if (!env.DB) console.error("DEBUG: env.DB is undefined!");
   return env.DB;
 }
 
 // ---------------------------
-// GET all products
+// GET all products or single product
 // ---------------------------
 export async function GET(req: NextRequest) {
   try {
@@ -24,49 +19,33 @@ export async function GET(req: NextRequest) {
     const categoryId = searchParams.get("category_id");
     const productId = searchParams.get("id");
 
-    const isDev = process.env.NODE_ENV === "development";
-
+    // Single product with all images
     if (productId) {
-      // Single product
-      let product, images;
-      if (isDev) {
-        product = db.prepare("SELECT * FROM products WHERE id = ?").get(productId);
-        images = db.prepare("SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order ASC").all(productId);
-      } else {
-        const pr = await db.prepare("SELECT * FROM products WHERE id = ?").bind(productId).all();
-        product = pr.results[0];
-        const ir = await db.prepare("SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order ASC").bind(productId).all();
-        images = ir.results;
-      }
+      const pr = await db.prepare("SELECT * FROM products WHERE id = ?").bind(productId).all();
+      const product = pr.results[0];
+
+      const ir = await db.prepare("SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order ASC").bind(productId).all();
+      const images = ir.results;
+
       console.log("DEBUG GET single product:", { product, images });
       return NextResponse.json({ product: { ...product, images } });
     }
 
-    // All products
-    let products;
-    const baseQuery = `
+    // All products with first image
+    let query = `
       SELECT p.*, 
         (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY sort_order ASC LIMIT 1) AS image_url
       FROM products p
     `;
-    const orderBy = " ORDER BY p.created_at DESC";
+    if (categoryId) query += " WHERE p.category_id = ?";
+    query += " ORDER BY p.created_at DESC";
 
-    if (isDev) {
-      if (categoryId) {
-        products = db.prepare(baseQuery + " WHERE p.category_id = ?" + orderBy).all(categoryId);
-      } else {
-        products = db.prepare(baseQuery + orderBy).all();
-      }
-    } else {
-      const query = categoryId ? baseQuery + " WHERE p.category_id = ?" + orderBy : baseQuery + orderBy;
-      const res = categoryId
-        ? await db.prepare(query).bind(categoryId).all()
-        : await db.prepare(query).all();
-      products = res.results;
-    }
+    const res = categoryId
+      ? await db.prepare(query).bind(categoryId).all()
+      : await db.prepare(query).all();
 
-    console.log("DEBUG GET all products:", products);
-    return NextResponse.json({ results: products });
+    console.log("DEBUG GET all products:", res.results);
+    return NextResponse.json({ results: res.results });
   } catch (err: unknown) {
     console.error("DEBUG GET ERROR:", err);
     const message = err instanceof Error ? err.message : JSON.stringify(err);
@@ -89,32 +68,26 @@ export async function POST(req: NextRequest) {
     };
 
     if (!name || !price || !category_id) {
-      return NextResponse.json({ error: "name, price and category_id are required" }, { status: 400 });
+      return NextResponse.json({ error: "name, price, and category_id are required" }, { status: 400 });
     }
 
-    const isDev = process.env.NODE_ENV === "development";
-    let productId: number;
+    // Insert product
+    const result = await db.prepare(
+      "INSERT INTO products (name, price, description, category_id, image_url) VALUES (?, ?, ?, ?, ?)"
+    ).bind(name, price, description || "", category_id, image_urls?.[0] ?? "").run();
 
-    if (isDev) {
-      const result = db.prepare("INSERT INTO products (name, price, description, category_id) VALUES (?, ?, ?, ?)").run(name, price, description || "", category_id);
-      productId = result.lastInsertRowid;
+    const productId = result.meta?.last_row_id ?? 0;
 
-      if (image_urls?.length) {
-        const stmt = db.prepare("INSERT INTO product_images (product_id, image_url, sort_order) VALUES (?, ?, ?)");
-        image_urls.forEach((url, i) => stmt.run(productId, url, i));
-      }
-    } else {
-      const result = await db.prepare("INSERT INTO products (name, price, description, category_id) VALUES (?, ?, ?, ?)").bind(name, price, description || "", category_id).run();
-      productId = result.meta?.last_row_id ?? 0;
-
-      if (image_urls?.length) {
-        for (let i = 0; i < image_urls.length; i++) {
-          await db.prepare("INSERT INTO product_images (product_id, image_url, sort_order) VALUES (?, ?, ?)").bind(productId, image_urls[i], i).run();
-        }
+    // Insert additional images
+    if (image_urls?.length) {
+      for (let i = 0; i < image_urls.length; i++) {
+        await db.prepare(
+          "INSERT INTO product_images (product_id, image_url, sort_order) VALUES (?, ?, ?)"
+        ).bind(productId, image_urls[i], i).run();
       }
     }
 
-    console.log("DEBUG POST product created:", { productId, name, price, category_id });
+    console.log("DEBUG POST created product:", { productId, name, price, category_id, image_urls });
     return NextResponse.json({ success: true, product: { id: productId, name, price, description, category_id } });
   } catch (err: unknown) {
     console.error("DEBUG POST ERROR:", err);
@@ -132,15 +105,8 @@ export async function DELETE(req: NextRequest) {
     const { id } = await req.json() as { id: number };
     if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
-    const isDev = process.env.NODE_ENV === "development";
-
-    if (isDev) {
-      db.prepare("DELETE FROM product_images WHERE product_id = ?").run(id);
-      db.prepare("DELETE FROM products WHERE id = ?").run(id);
-    } else {
-      await db.prepare("DELETE FROM product_images WHERE product_id = ?").bind(id).run();
-      await db.prepare("DELETE FROM products WHERE id = ?").bind(id).run();
-    }
+    await db.prepare("DELETE FROM product_images WHERE product_id = ?").bind(id).run();
+    await db.prepare("DELETE FROM products WHERE id = ?").bind(id).run();
 
     console.log("DEBUG DELETE product:", id);
     return NextResponse.json({ success: true });
