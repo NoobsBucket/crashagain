@@ -34,9 +34,6 @@ function getDB() {
   return env.DB;
 }
 
-// ---------------------------
-// POST: Add a new category
-// ---------------------------
 export const POST = async (req: Request) => {
   try {
     const db = getDB();
