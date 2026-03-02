@@ -1,0 +1,302 @@
+/* ════════════════════════════════════════
+   SECTION
+════════════════════════════════════════ */
+.section {
+  background: #f7f3ee;
+  padding: 56px 0 52px;
+  font-family: "Jost", "Helvetica Neue", sans-serif;
+  overflow-x: hidden;
+}
+
+/* ════════════════════════════════════════
+   HEADER
+════════════════════════════════════════ */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 40px 28px;
+  gap: 16px;
+}
+
+.sectionTitle {
+  font-family: "Jost", "Helvetica Neue", sans-serif;
+  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+  font-weight: 300;
+  color: #18180f;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+/* ════════════════════════════════════════
+   CAROUSEL OUTER — hover target for arrows
+════════════════════════════════════════ */
+.carouselOuter {
+  position: relative;
+}
+
+/* show arrows only when hovering the carousel */
+.carouselOuter:hover .arrowOverlay:not(.arrowHidden) {
+  opacity: 1;
+  pointer-events: all;
+}
+
+/* ════════════════════════════════════════
+   OVERLAY ARROW BUTTONS
+════════════════════════════════════════ */
+.arrowOverlay {
+  position: absolute;
+  top: 40%; /* aligned to image area, not full card height */
+  transform: translateY(-50%);
+  z-index: 20;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.95);
+  color: #18180f;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.1),
+    0 8px 24px rgba(0, 0, 0, 0.14);
+  /* hidden by default */
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity    0.25s ease,
+    background 0.2s  ease,
+    color      0.2s  ease,
+    transform  0.2s  ease;
+}
+
+.arrowOverlay:hover {
+  background: #18180f;
+  color: #f7f3ee;
+}
+
+/* nudge slightly inside the padding so they're fully visible */
+.arrowLeft  {
+  left: 12px;
+  transform: translateY(-50%);
+}
+.arrowRight {
+  right: 12px;
+  transform: translateY(-50%);
+}
+
+.arrowLeft:hover  { transform: translateY(-50%) scale(1.08); }
+.arrowRight:hover { transform: translateY(-50%) scale(1.08); }
+
+.arrowHidden {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* ════════════════════════════════════════
+   TRACK WRAPPER
+════════════════════════════════════════ */
+.trackWrapper {
+  padding: 0 40px;
+}
+
+/* ════════════════════════════════════════
+   SCROLLABLE TRACK
+════════════════════════════════════════ */
+.track {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: visible;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 20px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.track::-webkit-scrollbar {
+  display: none;
+}
+
+/* ════════════════════════════════════════
+   PRODUCT CARD
+════════════════════════════════════════ */
+.card {
+  flex: 0 0 calc((100vw - 80px - 3 * 12px) / 4);
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.04),
+    0 4px 16px rgba(0, 0, 0, 0.06);
+  transition: box-shadow 0.3s ease, transform 0.3s ease, border-color 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.card:hover {
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.05),
+    0 16px 48px rgba(0, 0, 0, 0.13);
+  transform: translateY(-4px);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+@media (max-width: 1199px) {
+  .card { flex: 0 0 calc((100vw - 80px - 2 * 12px) / 3); }
+}
+
+@media (max-width: 860px) {
+  .card { flex: 0 0 calc((100vw - 80px - 1 * 12px) / 2); }
+}
+
+@media (max-width: 520px) {
+  .card         { flex: 0 0 calc(100vw - 40px); }
+  .trackWrapper { padding: 0 20px; }
+  .header       { padding: 0 20px 20px; }
+}
+
+/* ════════════════════════════════════════
+   IMAGE AREA
+════════════════════════════════════════ */
+.imgWrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: #ede8e0;
+}
+
+.img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  display: block;
+}
+
+.card:hover .img {
+  transform: scale(1.06);
+}
+
+/* ════════════════════════════════════════
+   BADGE TAG
+════════════════════════════════════════ */
+.tag {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 4;
+  background: #18180f;
+  color: #f7f3ee;
+  font-family: "Jost", sans-serif;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 4px 11px;
+  border-radius: 100px;
+}
+
+/* ════════════════════════════════════════
+   CARD INFO (always visible below image)
+════════════════════════════════════════ */
+.info {
+  padding: 14px 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  background: #ffffff;
+}
+
+.title {
+  font-family: "Jost", sans-serif;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #18180f;
+  margin: 0;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.price {
+  font-family: "Jost", sans-serif;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #b5622a;
+  margin: 0;
+  letter-spacing: 0.02em;
+}
+
+/* ════════════════════════════════════════
+   BUTTON GROUP — always visible at bottom
+════════════════════════════════════════ */
+.btnGroup {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.btnCart {
+  flex: 1;
+  padding: 10px 12px;
+  background: #18180f;
+  color: #f7f3ee;
+  border: none;
+  border-radius: 100px;
+  font-family: "Jost", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.btnCart:hover {
+  background: #333328;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+.btnCartAdded {
+  background: #2d7a45 !important;
+  color: #fff !important;
+}
+
+.btnLearn {
+  flex: 1;
+  padding: 10px 12px;
+  background: transparent;
+  color: #18180f;
+  border: 1.5px solid rgba(0, 0, 0, 0.16);
+  border-radius: 100px;
+  font-family: "Jost", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.btnLearn:hover {
+  background: #18180f;
+  color: #f7f3ee;
+  border-color: #18180f;
+  transform: translateY(-1px);
+}

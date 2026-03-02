@@ -1,0 +1,12 @@
+.productCard{
+  display: flex;
+}
+
+.card{
+border: 1px solid black ;
+}
+
+/* img{
+  padding: 20px;
+
+} */
