@@ -12,19 +12,20 @@
 		"publish": true
 	},
 	"dependencies": {
+		"@aws-sdk/client-s3": "^3.992.0",
+		"@clerk/nextjs": "^6.39.0",
 		"@opennextjs/cloudflare": "1.14.0",
-		"next": "16.0.7",
-		"react": "19.2.3",
-		"react-dom": "19.2.3",
 		"axios": "^1.13.5",
 		"better-sqlite3": "^12.6.2",
-		"@aws-sdk/client-s3": "^3.992.0",
-		"@clerk/nextjs": "^6.39.0"
+		"next": "16.0.7",
+		"react": "19.2.3",
+		"react-dom": "19.2.3"
 	},
 	"devDependencies": {
-		"@types/better-sqlite3": "^7.6.13",
+		"@cloudflare/workers-types": "^4.20260301.1",
 		"@eslint/eslintrc": "3",
 		"@tailwindcss/postcss": "4.1.17",
+		"@types/better-sqlite3": "^7.6.13",
 		"@types/node": "24.10.1",
 		"@types/react": "19.2.7",
 		"@types/react-dom": "19.2.3",
