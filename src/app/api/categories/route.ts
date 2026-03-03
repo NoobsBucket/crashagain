@@ -4,9 +4,6 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
-// ---------------------------
-// D1 interfaces
-// ---------------------------
 interface D1BoundStatement {
   run: () => Promise<{ meta?: { last_row_id?: number } }>;
   all: () => Promise<{ results: unknown[] }>;
@@ -19,9 +16,6 @@ interface D1Database {
   };
 }
 
-// ---------------------------
-// Helper: get DB
-// ---------------------------
 async function getDB(): Promise<D1Database> {
   if (process.env.NODE_ENV === "development") {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -30,7 +24,6 @@ async function getDB(): Promise<D1Database> {
     const path = require("path");
     const sqlite = new Database(path.join(process.cwd(), "local.db"));
 
-    // Wrap better-sqlite3 (sync) to match the async D1 interface
     return {
       prepare: (query: string) => ({
         bind: (...args: unknown[]) => ({
@@ -38,27 +31,33 @@ async function getDB(): Promise<D1Database> {
             const result = sqlite.prepare(query).run(...args);
             return { meta: { last_row_id: result.lastInsertRowid as number } };
           },
-          all: async () => ({
-            results: sqlite.prepare(query).all(...args),
-          }),
+          all: async () => ({ results: sqlite.prepare(query).all(...args) }),
         }),
-        all: async () => ({
-          results: sqlite.prepare(query).all(),
-        }),
+        all: async () => ({ results: sqlite.prepare(query).all() }),
       }),
     };
   }
 
-  // Production — Cloudflare D1 (must be async)
   const { env } = await getCloudflareContext({ async: true });
   const db = (env as { DB: D1Database }).DB;
   if (!db) throw new Error("D1 DB binding is missing. Check your Cloudflare bindings.");
   return db;
 }
 
-// ---------------------------
+// GET: Fetch all categories
+export async function GET() {
+  try {
+    const db = await getDB();
+    const res = await db.prepare("SELECT * FROM categories ORDER BY id DESC").all();
+    return NextResponse.json({ results: res.results });
+  } catch (err: unknown) {
+    console.error("GET /categories error:", err);
+    const message = err instanceof Error ? err.message : "Internal Server Error";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
 // POST: Add a new category
-// ---------------------------
 export async function POST(req: NextRequest) {
   try {
     const db = await getDB();
@@ -83,16 +82,28 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ---------------------------
-// GET: Fetch all categories
-// ---------------------------
-export async function GET() {
+// DELETE: Remove a category by id
+export async function DELETE(req: NextRequest) {
   try {
     const db = await getDB();
-    const res = await db.prepare("SELECT * FROM categories ORDER BY id DESC").all();
-    return NextResponse.json({ results: res.results });
+    const { id } = (await req.json()) as { id?: unknown };
+
+    const numId = Number(id);
+    if (!numId || isNaN(numId)) {
+      return NextResponse.json({ error: "A valid numeric id is required" }, { status: 400 });
+    }
+
+    // Check it exists first
+    const existing = await db.prepare("SELECT id FROM categories WHERE id = ?").bind(numId).all();
+    if (!existing.results.length) {
+      return NextResponse.json({ error: "Category not found" }, { status: 404 });
+    }
+
+    await db.prepare("DELETE FROM categories WHERE id = ?").bind(numId).run();
+
+    return NextResponse.json({ success: true });
   } catch (err: unknown) {
-    console.error("GET /categories error:", err);
+    console.error("DELETE /categories error:", err);
     const message = err instanceof Error ? err.message : "Internal Server Error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
