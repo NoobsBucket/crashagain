@@ -1,8 +1,7 @@
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth, clerkClient } from "@clerk/nextjs/server";
-
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 
 function getDB() {
@@ -11,23 +10,22 @@ function getDB() {
     const path = require('path');
     return new Database(path.join(process.cwd(), 'local.db'));
   }
-  // Production — Cloudflare D1
   const { env } = getCloudflareContext();
-  return env.DB;
+  return (env as any).DB;
 }
 
-// GET orders - admin gets all, user gets their own
+const isDev = process.env.NODE_ENV === 'development';
+
+// ── GET orders ───────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const db = getDB();
-    const { searchParams } = new URL(req.url);
-    const isAdmin = searchParams.get('admin') === 'true';
-    const isDev = process.env.NODE_ENV === 'development';
+    const isAdmin = new URL(req.url).searchParams.get('admin') === 'true';
 
-    let orders, orderItems;
+    let orders: any[], orderItems: any[];
 
     if (isDev) {
       orders = isAdmin
@@ -37,26 +35,25 @@ export async function GET(req: NextRequest) {
     } else {
       const ordersRes = isAdmin
         ? await db.prepare('SELECT * FROM orders ORDER BY created_at DESC').all()
-        : await db.prepare('SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC').all(userId);
-      orders = ordersRes.results;
+        : await db.prepare('SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC').bind(userId).all();
+      orders = ordersRes.results ?? [];
       const itemsRes = await db.prepare('SELECT * FROM order_items').all();
-      orderItems = itemsRes.results;
+      orderItems = itemsRes.results ?? [];
     }
 
-    // Attach items to each order
-    const ordersWithItems = orders.map((order: Record<string, unknown>) => ({
+    const ordersWithItems = orders.map((order: any) => ({
       ...order,
-      items: orderItems.filter((item: Record<string, unknown>) => item.order_id === order.id)
+      items: orderItems.filter((item: any) => item.order_id === order.id),
     }));
 
     return NextResponse.json({ results: ordersWithItems });
-  } catch (err) {
-    console.error(err);
+  } catch (err: any) {
+    console.error('[orders] GET error:', err);
     return NextResponse.json({ error: 'Failed to fetch orders' }, { status: 500 });
   }
 }
 
-// POST place a new order
+// ── POST place a new order ────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
     const { userId } = await auth();
@@ -64,13 +61,14 @@ export async function POST(req: NextRequest) {
 
     const client = await clerkClient();
     const user = await client.users.getUser(userId);
-    const user_name = user?.firstName && user?.lastName
-      ? `${user.firstName} ${user.lastName}`
-      : user?.firstName || 'Anonymous';
+    const user_name =
+      user?.firstName && user?.lastName
+        ? `${user.firstName} ${user.lastName}`
+        : user?.firstName || 'Anonymous';
     const user_email = user?.emailAddresses?.[0]?.emailAddress || '';
 
     const db = getDB();
-    const { address, city, phone, items } = await req.json() as {
+    const { address, city, phone, items } = (await req.json()) as {
       address: string;
       city: string;
       phone: string;
@@ -82,8 +80,6 @@ export async function POST(req: NextRequest) {
     }
 
     const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-    const isDev = process.env.NODE_ENV === 'development';
-
     let orderId: number;
 
     if (isDev) {
@@ -99,44 +95,46 @@ export async function POST(req: NextRequest) {
     } else {
       const result = await db.prepare(
         'INSERT INTO orders (user_id, user_name, user_email, address, city, phone, total) VALUES (?, ?, ?, ?, ?, ?, ?)'
-      ).run(userId, user_name, user_email, address, city, phone, total);
-      orderId = result.lastInsertRowid as number;
+      ).bind(userId, user_name, user_email, address, city, phone, total).run();
+      orderId = result.meta?.last_row_id;
 
       for (const item of items) {
-        await db.prepare('INSERT INTO order_items (order_id, product_id, product_name, price, quantity) VALUES (?, ?, ?, ?, ?)').run(orderId, item.id, item.name, item.price, item.quantity);
+        await db.prepare(
+          'INSERT INTO order_items (order_id, product_id, product_name, price, quantity) VALUES (?, ?, ?, ?, ?)'
+        ).bind(orderId, item.id, item.name, item.price, item.quantity).run();
       }
     }
 
     return NextResponse.json({ success: true, orderId });
-  } catch (err) {
-    console.error(err);
+  } catch (err: any) {
+    console.error('[orders] POST error:', err);
     return NextResponse.json({ error: 'Failed to place order' }, { status: 500 });
   }
 }
 
-// PATCH update order status (admin only)
+// ── PATCH update order status ─────────────────────────────────────
 export async function PATCH(req: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const db = getDB();
-    const { id, status } = await req.json() as { id: number; status: string };
+    const { id, status } = (await req.json()) as { id: number; status: string };
 
     const validStatuses = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
-    if (!validStatuses.includes(status)) {
-      return NextResponse.json({ error: 'Invalid status' }, { status: 400 });
+    if (!id || !validStatuses.includes(status)) {
+      return NextResponse.json({ error: 'Invalid id or status' }, { status: 400 });
     }
 
-    if (process.env.NODE_ENV === 'development') {
+    if (isDev) {
       db.prepare('UPDATE orders SET status = ? WHERE id = ?').run(status, id);
     } else {
-      await db.prepare('UPDATE orders SET status = ? WHERE id = ?').run(status, id);
+      await db.prepare('UPDATE orders SET status = ? WHERE id = ?').bind(status, id).run();
     }
 
     return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error(err);
+  } catch (err: any) {
+    console.error('[orders] PATCH error:', err);
     return NextResponse.json({ error: 'Failed to update order' }, { status: 500 });
   }
 }
