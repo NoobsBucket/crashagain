@@ -132,10 +132,8 @@ export async function DELETE(req: NextRequest) {
     if (!existing.results?.length) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
-
     await DB.prepare("DELETE FROM product_images WHERE product_id = ?").bind(id).run();
     await DB.prepare("DELETE FROM products WHERE id = ?").bind(id).run();
-
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error("[products] DELETE error:", err);
