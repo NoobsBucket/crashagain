@@ -1,10 +1,8 @@
-import type { D1Database } from "@cloudflare/workers-types";
-
 declare global {
   // eslint-disable-next-line no-var
   var env: {
-    DB: D1Database;
-    R2_BUCKET: R2Bucket;
+    DB: any;
+    R2_BUCKET: any;
   };
 }
 
