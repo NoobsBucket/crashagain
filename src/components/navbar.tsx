@@ -1,12 +1,10 @@
 "use client";
-
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useUser, SignInButton, SignUpButton, SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import style from "../styles/navBar.module.css";
 import FloatingCart from "./floatingCart";
 import HamburgerMenu from "./hamburgerMenu";
-
 export default function Navbar() {
   const [menuOpen,  setMenuOpen]  = useState(false);
   const [scrolled,  setScrolled]  = useState(false);
@@ -44,8 +42,6 @@ export default function Navbar() {
       <style>{navCss}</style>
 
       <nav className={`cc-nav ${scrolled ? "cc-nav--scrolled" : ""}`}>
-
-        {/* ── Logo ── */}
         <button className="cc-logo" onClick={() => router.push("/")} aria-label="Go to home">
           <span className="cc-logo__icon">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -55,8 +51,6 @@ export default function Navbar() {
           </span>
           <span className="cc-logo__text">CrashCart</span>
         </button>
-
-        {/* ── Desktop links ── */}
         <ul className="cc-links">
           <li>
             <button className="cc-link" onClick={() => router.push("/")}>
