@@ -1,152 +1,98 @@
-export const runtime = "nodejs";
+export {};
+export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+declare global {
+  var env: {
+    DB: D1Database;
+  };
+}
 
+interface D1Database {
+  prepare: (query: string) => {
+    run: (...args: unknown[]) => { lastInsertRowid?: number };
+    bind?: (...args: unknown[]) => { run: () => { last_row_id?: number } };
+    all: () => { results: unknown[] };
+  };
+}
+
+import { getCloudflareContext } from '@opennextjs/cloudflare';
+
+// ---------------------------
+// Helper to get database
+// ---------------------------
 function getDB() {
-  if (process.env.NODE_ENV === "development") {
-    const Database = require("better-sqlite3");
-    const path = require("path");
-    return new Database(path.join(process.cwd(), "local.db"));
+  if (process.env.NODE_ENV === 'development') {
+    const Database = require('better-sqlite3');
+    const path = require('path');
+    return new Database(path.join(process.cwd(), 'local.db'));
   }
+  // Production — Cloudflare D1
   const { env } = getCloudflareContext();
-  if (!env.DB) console.error("DEBUG: env.DB is undefined!");
+  if (!env.DB) {
+    console.error('DEBUG: env.DB is undefined! Make sure your D1 binding exists.');
+  }
   return env.DB;
 }
 
 // ---------------------------
-// GET all products
+// POST: Add a new category
 // ---------------------------
-export async function GET(req: NextRequest) {
+export const POST = async (req: Request) => {
   try {
     const db = getDB();
-    const { searchParams } = new URL(req.url);
-    const categoryId = searchParams.get("category_id");
-    const productId = searchParams.get("id");
+    const { name, slug } = await req.json() as { name: string; slug: string };
 
-    const isDev = process.env.NODE_ENV === "development";
-
-    if (productId) {
-      // Single product
-      let product, images;
-      if (isDev) {
-        product = db.prepare("SELECT * FROM products WHERE id = ?").get(productId);
-        images = db.prepare("SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order ASC").all(productId);
-      } else {
-        const pr = await db.prepare("SELECT * FROM products WHERE id = ?").bind(productId).all();
-        product = pr.results[0];
-        const ir = await db.prepare("SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order ASC").bind(productId).all();
-        images = ir.results;
-      }
-      console.log("DEBUG GET single product:", { product, images });
-      return NextResponse.json({ product: { ...product, images } });
+    if (!name || !slug) {
+      return new Response(JSON.stringify({ error: "Please provide both name and slug" }), { status: 400 });
     }
 
-    // All products
-    let products;
-    const baseQuery = `
-      SELECT p.*, 
-        (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY sort_order ASC LIMIT 1) AS image_url
-      FROM products p
-    `;
-    const orderBy = " ORDER BY p.created_at DESC";
+    let result;
 
-    if (isDev) {
-      if (categoryId) {
-        products = db.prepare(baseQuery + " WHERE p.category_id = ?" + orderBy).all(categoryId);
-      } else {
-        products = db.prepare(baseQuery + orderBy).all();
-      }
+    if (process.env.NODE_ENV === 'development') {
+      result = db.prepare("INSERT INTO categories (name, slug) VALUES (?, ?)").run(name, slug);
+      console.log('DEBUG: Inserted in local DB:', result);
     } else {
-      const query = categoryId ? baseQuery + " WHERE p.category_id = ?" + orderBy : baseQuery + orderBy;
-      const res = categoryId
-        ? await db.prepare(query).bind(categoryId).all()
-        : await db.prepare(query).all();
-      products = res.results;
+      // D1 requires .bind()
+      result = await db.prepare("INSERT INTO categories (name, slug) VALUES (?, ?)")
+                       .bind(name, slug)
+                       .run();
+      console.log('DEBUG: Inserted in D1 DB:', result);
     }
 
-    console.log("DEBUG GET all products:", products);
-    return NextResponse.json({ results: products });
+    return new Response(JSON.stringify({
+      success: true,
+      category: { id: result.lastInsertRowid ?? result.meta?.last_row_id, name, slug }
+    }), { status: 200 });
+
   } catch (err: unknown) {
-    console.error("DEBUG GET ERROR:", err);
-    const message = err instanceof Error ? err.message : JSON.stringify(err);
-    return NextResponse.json({ error: `Failed to fetch products: ${message}` }, { status: 500 });
+    console.error('DEBUG POST ERROR:', err);
+    const message = err instanceof Error ? err.message : "Internal Server Error";
+    return new Response(JSON.stringify({ error: message }), { status: 500 });
   }
-}
+};
 
 // ---------------------------
-// POST create product
+// GET: Fetch all categories
 // ---------------------------
-export async function POST(req: NextRequest) {
+export const GET = async () => {
   try {
     const db = getDB();
-    const { name, price, description, category_id, image_urls } = await req.json() as {
-      name: string;
-      price: number;
-      description: string;
-      category_id: number;
-      image_urls?: string[];
-    };
 
-    if (!name || !price || !category_id) {
-      return NextResponse.json({ error: "name, price and category_id are required" }, { status: 400 });
-    }
-
-    const isDev = process.env.NODE_ENV === "development";
-    let productId: number;
-
-    if (isDev) {
-      const result = db.prepare("INSERT INTO products (name, price, description, category_id) VALUES (?, ?, ?, ?)").run(name, price, description || "", category_id);
-      productId = result.lastInsertRowid;
-
-      if (image_urls?.length) {
-        const stmt = db.prepare("INSERT INTO product_images (product_id, image_url, sort_order) VALUES (?, ?, ?)");
-        image_urls.forEach((url, i) => stmt.run(productId, url, i));
-      }
+    let results;
+    if (process.env.NODE_ENV === 'development') {
+      results = db.prepare("SELECT * FROM categories ORDER BY id DESC").all();
+      console.log('DEBUG: Fetched from local DB:', results);
     } else {
-      const result = await db.prepare("INSERT INTO products (name, price, description, category_id) VALUES (?, ?, ?, ?)").bind(name, price, description || "", category_id).run();
-      productId = result.meta?.last_row_id ?? 0;
-
-      if (image_urls?.length) {
-        for (let i = 0; i < image_urls.length; i++) {
-          await db.prepare("INSERT INTO product_images (product_id, image_url, sort_order) VALUES (?, ?, ?)").bind(productId, image_urls[i], i).run();
-        }
-      }
+      const res = await db.prepare("SELECT * FROM categories ORDER BY id DESC").all();
+      results = res.results;
+      console.log('DEBUG: Fetched from D1 DB:', results);
     }
 
-    console.log("DEBUG POST product created:", { productId, name, price, category_id });
-    return NextResponse.json({ success: true, product: { id: productId, name, price, description, category_id } });
+    return new Response(JSON.stringify({ results }), { status: 200 });
+
   } catch (err: unknown) {
-    console.error("DEBUG POST ERROR:", err);
-    const message = err instanceof Error ? err.message : JSON.stringify(err);
-    return NextResponse.json({ error: `Failed to create product: ${message}` }, { status: 500 });
+    console.error('DEBUG GET ERROR:', err);
+    const message = err instanceof Error ? err.message : "Internal Server Error";
+    return new Response(JSON.stringify({ error: message }), { status: 500 });
   }
-}
-
-// ---------------------------
-// DELETE product
-// ---------------------------
-export async function DELETE(req: NextRequest) {
-  try {
-    const db = getDB();
-    const { id } = await req.json() as { id: number };
-    if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
-
-    const isDev = process.env.NODE_ENV === "development";
-
-    if (isDev) {
-      db.prepare("DELETE FROM product_images WHERE product_id = ?").run(id);
-      db.prepare("DELETE FROM products WHERE id = ?").run(id);
-    } else {
-      await db.prepare("DELETE FROM product_images WHERE product_id = ?").bind(id).run();
-      await db.prepare("DELETE FROM products WHERE id = ?").bind(id).run();
-    }
-
-    console.log("DEBUG DELETE product:", id);
-    return NextResponse.json({ success: true });
-  } catch (err: unknown) {
-    console.error("DEBUG DELETE ERROR:", err);
-    const message = err instanceof Error ? err.message : JSON.stringify(err);
-    return NextResponse.json({ error: `Failed to delete product: ${message}` }, { status: 500 });
-  }
-}
+};
