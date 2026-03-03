@@ -462,7 +462,7 @@ export default function Admin() {
                     <input className="adm-input" placeholder="Product name" value={productName} onChange={e => setProductName(e.target.value)} />
                   </div>
                   <div className="adm-field">
-                    <label className="adm-label">Price ($)</label>
+                    <label className="adm-label">Price (Rs.)</label>
                     <input className="adm-input" type="number" placeholder="0.00" value={productPrice} onChange={e => setProductPrice(e.target.value)} />
                   </div>
                 </div>

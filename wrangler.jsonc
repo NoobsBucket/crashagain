@@ -12,10 +12,6 @@
     "enabled": true
   },
   "upload_source_maps": true,
-  "vars": {
-    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuY3Jhc2hjYXJ0LnNob3Ak"
-  },
-    
   "d1_databases": [
     {
       "binding": "DB",
