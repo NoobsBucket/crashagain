@@ -80,7 +80,7 @@ export default function FloatingCart() {
                     <div style={{ fontWeight: 600, fontSize: "0.9rem", marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {item.name}
                     </div>
-                    <div style={{ color: "#c8824a", fontWeight: 700, fontSize: "0.9rem" }}>RS {item.price.toFixed(2)}</div>
+                    <div style={{ color: "#c8824a", fontWeight: 700, fontSize: "0.9rem" }}>${item.price.toFixed(2)}</div>
                   </div>
                   {/* Quantity controls */}
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -109,7 +109,7 @@ export default function FloatingCart() {
           <div style={{ padding: "20px 24px", borderTop: "1px solid #eee" }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
               <span style={{ fontWeight: 600 }}>Total</span>
-              <span style={{ fontWeight: 700, fontSize: "1.2rem", color: "#1a1a18" }}>RS {totalPrice.toFixed(2)}</span>
+              <span style={{ fontWeight: 700, fontSize: "1.2rem", color: "#1a1a18" }}>${totalPrice.toFixed(2)}</span>
             </div>
             <button
               onClick={handleCheckout}
@@ -121,7 +121,7 @@ export default function FloatingCart() {
               onMouseEnter={e => (e.currentTarget.style.background = "#333")}
               onMouseLeave={e => (e.currentTarget.style.background = "#1a1a18")}
             >
-              Checkout — RS {totalPrice.toFixed(2)}
+              Checkout — ${totalPrice.toFixed(2)}
             </button>
           </div>
         )}

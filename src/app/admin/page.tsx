@@ -47,8 +47,8 @@ export default function Admin() {
   };
 
   /* ── Upload progress ── */
-  const [uploadProgress, setUploadProgress] = useState(0);   // 0–100
-  const [uploadStep, setUploadStep] = useState("");   // e.g. "Uploading image 2 of 3…"
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStep, setUploadStep] = useState("");
 
   /* ── Categories ── */
   const [categoryName, setCategoryName] = useState("");
@@ -87,15 +87,10 @@ export default function Admin() {
   }, []);
 
   const fetchProducts = useCallback(async () => {
-    const url =
-      selectedCategory === "all"
-        ? "/api/products"
-        : `/api/products?category_id=${selectedCategory}`;
-
+    const url = selectedCategory === "all" ? "/api/products" : `/api/products?category_id=${selectedCategory}`;
     const data = await fetchJSON<ApiResponse<Product>>(url);
     setProducts(data.results || []);
   }, [selectedCategory]);
-
 
   const fetchBanners = useCallback(async () => {
     const data = await fetchJSON<ApiResponse<Banner>>("/api/banners");
@@ -103,11 +98,7 @@ export default function Admin() {
   }, []);
 
   const fetchOrders = useCallback(async () => {
-    const data = await fetchJSON<ApiResponse<Order>>(
-      "/api/orders?admin=true",
-      { credentials: "include" }
-    );
-
+    const data = await fetchJSON<ApiResponse<Order>>("/api/orders?admin=true", { credentials: "include" });
     setOrders(data.results || []);
   }, []);
 
@@ -122,11 +113,9 @@ export default function Admin() {
       const xhr = new XMLHttpRequest();
       const formData = new FormData();
       formData.append("file", file);
-
       xhr.upload.addEventListener("progress", e => {
         if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
       });
-
       xhr.addEventListener("load", () => {
         try {
           const data = JSON.parse(xhr.responseText);
@@ -134,7 +123,6 @@ export default function Admin() {
           else reject(new Error(data.error || "Upload failed"));
         } catch { reject(new Error("Invalid response")); }
       });
-
       xhr.addEventListener("error", () => reject(new Error("Network error")));
       xhr.open("POST", "/api/upload/bannerUpload");
       xhr.send(formData);
@@ -161,6 +149,19 @@ export default function Admin() {
     }
   };
 
+  // ── DELETE CATEGORY ──
+  const deleteCategory = (id: number, name: string) => {
+    askConfirm(`Delete category "${name}"? This cannot be undone.`, async () => {
+      const res = await fetch("/api/categories", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) { fetchCategories(); toast("success", `Category "${name}" deleted.`); }
+      else toast("error", "Failed to delete category.");
+    });
+  };
+
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     setProductImages(prev => [...prev, ...files]);
@@ -182,20 +183,16 @@ export default function Admin() {
     try {
       const image_urls: string[] = [];
       const total = productImages.length;
-
       for (let i = 0; i < total; i++) {
         setUploadStep(total > 1 ? `Uploading image ${i + 1} of ${total}…` : "Uploading image…");
         const url = await uploadImageWithProgress(productImages[i], pct => {
-          // Overall progress = past images (100% each) + current image progress
           const overall = Math.round(((i * 100) + pct) / Math.max(total, 1));
           setUploadProgress(overall);
         });
         image_urls.push(url);
       }
-
       setUploadStep("Saving product…");
       setUploadProgress(100);
-
       const res = await fetch("/api/products", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -207,7 +204,6 @@ export default function Admin() {
           image_urls,
         }),
       });
-
       if (res.ok) {
         setProductName(""); setProductPrice(""); setProductDescription("");
         setProductCategory(""); setProductImages([]); setImagePreviews([]);
@@ -247,13 +243,9 @@ export default function Admin() {
     setUploadProgress(0);
     setUploadStep("Uploading banner image…");
     try {
-      const image_url = await uploadImageWithProgress(bannerImage, pct => {
-        setUploadProgress(pct);
-      });
-
+      const image_url = await uploadImageWithProgress(bannerImage, pct => setUploadProgress(pct));
       setUploadStep("Saving banner…");
       setUploadProgress(100);
-
       const payload = {
         image_url,
         heading: bannerHeading.trim(),
@@ -261,33 +253,22 @@ export default function Admin() {
         sort_order: parseInt(bannerSortOrder) || 0,
         link_to: bannerLinkTo.trim() !== "" ? bannerLinkTo.trim() : null,
       };
-
-      console.log("📤 Banner payload:", payload); // ← check this in browser console
-
       const res = await fetch("/api/banners", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-
       if (res.ok) {
-        setBannerHeading("");
-        setBannerButtonText("");
-        setBannerSortOrder("0");
-        setBannerLinkTo("");
-        setBannerImage(null);
-        setBannerPreview("");
+        setBannerHeading(""); setBannerButtonText(""); setBannerSortOrder("0");
+        setBannerLinkTo(""); setBannerImage(null); setBannerPreview("");
         fetchBanners();
         toast("success", "Banner added successfully.");
       } else {
-        // This will show you the actual error from your API
-        const errBody =
-          (await res.json().catch(() => null)) as { message?: string } | null;
-        console.error("❌ Banner API error:", res.status, errBody);
+        const errBody = (await res.json().catch(() => null)) as { message?: string } | null;
         toast("error", `Failed to save banner: ${errBody?.message || res.statusText}`);
       }
     } catch (err) {
-      console.error("❌ Banner upload exception:", err);
+      console.error(err);
       toast("error", "Banner upload failed. Check your connection.");
     } finally {
       setBannerUploading(false);
@@ -295,6 +276,7 @@ export default function Admin() {
       setUploadStep("");
     }
   };
+
   const deleteBanner = (id: number, heading: string) => {
     askConfirm(`Delete banner "${heading}"? This cannot be undone.`, async () => {
       const res = await fetch("/api/banners", {
@@ -324,9 +306,6 @@ export default function Admin() {
 
   const isUploading = uploading || bannerUploading;
 
-  /* ══════════════════════════════════════════════
-     RENDER
-  ══════════════════════════════════════════════ */
   return (
     <>
       <Navbar />
@@ -433,13 +412,16 @@ export default function Admin() {
               {categories.length === 0 ? <p className="adm-empty">No categories yet.</p> : (
                 <div className="adm-table-wrap">
                   <table className="adm-table">
-                    <thead><tr><th>ID</th><th>Name</th><th>Slug</th></tr></thead>
+                    <thead><tr><th>ID</th><th>Name</th><th>Slug</th><th></th></tr></thead>
                     <tbody>
                       {categories.map(cat => (
                         <tr key={cat.id}>
                           <td><span className="adm-id">#{cat.id}</span></td>
                           <td>{cat.name}</td>
                           <td><code className="adm-slug">{cat.slug}</code></td>
+                          <td>
+                            <button className="adm-btn adm-btn--danger adm-btn--sm" onClick={() => deleteCategory(cat.id, cat.name)}>Delete</button>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -462,7 +444,7 @@ export default function Admin() {
                     <input className="adm-input" placeholder="Product name" value={productName} onChange={e => setProductName(e.target.value)} />
                   </div>
                   <div className="adm-field">
-                    <label className="adm-label">Price (Rs.)</label>
+                    <label className="adm-label">Price (RS)</label>
                     <input className="adm-input" type="number" placeholder="0.00" value={productPrice} onChange={e => setProductPrice(e.target.value)} />
                   </div>
                 </div>
@@ -497,7 +479,6 @@ export default function Admin() {
                   )}
                 </div>
 
-                {/* Per-form progress bar */}
                 {uploading && (
                   <div className="adm-progress-wrap">
                     <div className="adm-progress-header">
@@ -533,7 +514,7 @@ export default function Admin() {
                         <tr key={p.id}>
                           <td>{p.image_url ? <img src={p.image_url} className="adm-thumb" alt="" /> : <span className="adm-no-img">—</span>}</td>
                           <td>{p.name}</td>
-                          <td className="adm-price">${p.price}</td>
+                          <td className="adm-price">RS {p.price}</td>
                           <td><span className="adm-cat-badge">{categories.find(c => c.id === p.category_id)?.name || "—"}</span></td>
                           <td><button className="adm-btn adm-btn--danger adm-btn--sm" onClick={() => deleteProduct(p.id, p.name)}>Delete</button></td>
                         </tr>
@@ -573,12 +554,7 @@ export default function Admin() {
                       Link To Category
                       <span className="adm-label__hint"> — button scrolls to this section</span>
                     </label>
-                    <select
-                      key={bannerLinkTo}
-                      className="adm-input adm-select"
-                      value={bannerLinkTo}
-                      onChange={e => setBannerLinkTo(e.target.value)}
-                    >
+                    <select key={bannerLinkTo} className="adm-input adm-select" value={bannerLinkTo} onChange={e => setBannerLinkTo(e.target.value)}>
                       <option value="">No link (decorative)</option>
                       {categories.map(cat => <option key={cat.id} value={cat.slug}>{cat.name} ({cat.slug})</option>)}
                     </select>
@@ -594,7 +570,6 @@ export default function Admin() {
                   {bannerPreview && <img src={bannerPreview} className="adm-banner-preview" alt="" />}
                 </div>
 
-                {/* Banner upload progress */}
                 {bannerUploading && (
                   <div className="adm-progress-wrap">
                     <div className="adm-progress-header">
@@ -667,7 +642,7 @@ export default function Admin() {
                           <span className="adm-order__user">{order.user_name} · {order.user_email}</span>
                           <div className="adm-order__right">
                             <span className="adm-status-pill" style={{ color: sm.color, background: sm.bg, border: `1px solid ${sm.border}` }}>{order.status}</span>
-                            <span className="adm-order__total">${order.total.toFixed(2)}</span>
+                            <span className="adm-order__total">RS {order.total.toFixed(2)}</span>
                             <span className={`adm-chevron ${open ? "adm-chevron--open" : ""}`}>
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 12 15 18 9" /></svg>
                             </span>
@@ -684,7 +659,7 @@ export default function Admin() {
                                     <div className="adm-item-dot" />
                                     <span className="adm-order__item-name">{item.product_name}</span>
                                     <span className="adm-order__item-qty">×{item.quantity}</span>
-                                    <span className="adm-order__item-price">${(item.price * item.quantity).toFixed(2)}</span>
+                                    <span className="adm-order__item-price">RS {(item.price * item.quantity).toFixed(2)}</span>
                                   </div>
                                 ))}
                               </div>
@@ -725,9 +700,6 @@ export default function Admin() {
   );
 }
 
-/* ═══════════════════════════════════════════════════
-   CSS
-═══════════════════════════════════════════════════ */
 const css = `
   @import url('https://fonts.googleapis.com/css2?family=Jost:wght@300;400;500;600;700&display=swap');
 
@@ -761,345 +733,66 @@ const css = `
     color: var(--text);
   }
 
-  /* ════════════════════════════
-     TOAST NOTIFICATIONS
-  ════════════════════════════ */
-  .toast-stack {
-    position: fixed;
-    bottom: 28px;
-    right: 24px;
-    z-index: 9999;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    align-items: flex-end;
-    pointer-events: none;
-  }
-
-  .toast {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 13px 16px;
-    border-radius: 14px;
-    font-family: 'Jost', sans-serif;
-    font-size: 0.83rem;
-    font-weight: 400;
-    color: var(--text);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    min-width: 260px;
-    max-width: 380px;
-    pointer-events: all;
-    animation: toastIn 0.3s cubic-bezier(.22,1,.36,1) both;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-    letter-spacing: 0.01em;
-    line-height: 1.4;
-  }
-
-  @keyframes toastIn {
-    from { opacity: 0; transform: translateY(12px) scale(0.95); }
-    to   { opacity: 1; transform: translateY(0)    scale(1); }
-  }
-
-  .toast--success {
-    background: rgba(124,158,135,0.18);
-    border: 1px solid rgba(124,158,135,0.35);
-  }
+  .toast-stack { position: fixed; bottom: 28px; right: 24px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; align-items: flex-end; pointer-events: none; }
+  .toast { display: flex; align-items: center; gap: 10px; padding: 13px 16px; border-radius: 14px; font-family: 'Jost', sans-serif; font-size: 0.83rem; font-weight: 400; color: var(--text); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); min-width: 260px; max-width: 380px; pointer-events: all; animation: toastIn 0.3s cubic-bezier(.22,1,.36,1) both; box-shadow: 0 8px 32px rgba(0,0,0,0.4); letter-spacing: 0.01em; line-height: 1.4; }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(12px) scale(0.95); } to { opacity: 1; transform: translateY(0) scale(1); } }
+  .toast--success { background: rgba(124,158,135,0.18); border: 1px solid rgba(124,158,135,0.35); }
   .toast--success .toast__icon { color: var(--accent); }
-
-  .toast--error {
-    background: rgba(248,113,113,0.15);
-    border: 1px solid rgba(248,113,113,0.3);
-  }
+  .toast--error { background: rgba(248,113,113,0.15); border: 1px solid rgba(248,113,113,0.3); }
   .toast--error .toast__icon { color: var(--danger); }
-
-  .toast--info {
-    background: rgba(96,165,250,0.12);
-    border: 1px solid rgba(96,165,250,0.25);
-  }
+  .toast--info { background: rgba(96,165,250,0.12); border: 1px solid rgba(96,165,250,0.25); }
   .toast--info .toast__icon { color: #60a5fa; }
-
   .toast__icon { flex-shrink: 0; display: flex; }
   .toast__msg  { flex: 1; }
-
-  .toast__close {
-    flex-shrink: 0;
-    background: none;
-    border: none;
-    color: var(--text-3);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2px;
-    border-radius: 4px;
-    transition: color 0.15s;
-  }
+  .toast__close { flex-shrink: 0; background: none; border: none; color: var(--text-3); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 2px; border-radius: 4px; transition: color 0.15s; }
   .toast__close:hover { color: var(--text); }
 
-  /* ════════════════════════════
-     CONFIRM DIALOG
-  ════════════════════════════ */
-  .confirm-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(10,12,18,0.75);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    z-index: 9998;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-    animation: fadeIn 0.2s ease both;
-  }
-
+  .confirm-overlay { position: fixed; inset: 0; background: rgba(10,12,18,0.75); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); z-index: 9998; display: flex; align-items: center; justify-content: center; padding: 20px; animation: fadeIn 0.2s ease both; }
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-  .confirm-box {
-    background: var(--surface);
-    border: 1px solid var(--border-hi);
-    border-radius: 20px;
-    padding: 32px 28px;
-    max-width: 380px;
-    width: 100%;
-    text-align: center;
-    animation: popIn 0.25s cubic-bezier(.22,1,.36,1) both;
-  }
-
-  @keyframes popIn {
-    from { opacity: 0; transform: scale(0.93); }
-    to   { opacity: 1; transform: scale(1); }
-  }
-
-  .confirm-icon {
-    width: 52px; height: 52px;
-    border-radius: 50%;
-    background: rgba(248,113,113,0.1);
-    border: 1px solid rgba(248,113,113,0.25);
-    display: flex; align-items: center; justify-content: center;
-    color: var(--danger);
-    margin: 0 auto 18px;
-  }
-
-  .confirm-msg {
-    font-size: 0.9rem;
-    color: var(--text-2);
-    line-height: 1.65;
-    margin-bottom: 24px;
-    font-family: 'Jost', sans-serif;
-  }
-
+  .confirm-box { background: var(--surface); border: 1px solid var(--border-hi); border-radius: 20px; padding: 32px 28px; max-width: 380px; width: 100%; text-align: center; animation: popIn 0.25s cubic-bezier(.22,1,.36,1) both; }
+  @keyframes popIn { from { opacity: 0; transform: scale(0.93); } to { opacity: 1; transform: scale(1); } }
+  .confirm-icon { width: 52px; height: 52px; border-radius: 50%; background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.25); display: flex; align-items: center; justify-content: center; color: var(--danger); margin: 0 auto 18px; }
+  .confirm-msg { font-size: 0.9rem; color: var(--text-2); line-height: 1.65; margin-bottom: 24px; font-family: 'Jost', sans-serif; }
   .confirm-btns { display: flex; gap: 10px; justify-content: center; }
 
-  /* ════════════════════════════
-     GLOBAL UPLOAD PROGRESS BAR (top of page)
-  ════════════════════════════ */
-  .upload-bar-wrap {
-    position: fixed;
-    top: 62px;
-    left: 0; right: 0;
-    z-index: 200;
-    background: rgba(15,17,23,0.92);
-    border-bottom: 1px solid var(--border);
-    padding: 10px 24px;
-    backdrop-filter: blur(10px);
-  }
-
+  .upload-bar-wrap { position: fixed; top: 62px; left: 0; right: 0; z-index: 200; background: rgba(15,17,23,0.92); border-bottom: 1px solid var(--border); padding: 10px 24px; backdrop-filter: blur(10px); }
   .upload-bar-inner { max-width: 1000px; margin: 0 auto; }
-
-  .upload-bar-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 7px;
-  }
-
+  .upload-bar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
   .upload-bar-step { font-size: 0.75rem; color: var(--text-2); letter-spacing: 0.04em; font-family: 'Jost', sans-serif; }
   .upload-bar-pct  { font-size: 0.75rem; font-weight: 600; color: var(--accent); font-family: 'Jost', sans-serif; }
+  .upload-bar-track { height: 4px; background: var(--surface2); border-radius: 100px; overflow: hidden; }
+  .upload-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), #9ec4aa); border-radius: 100px; transition: width 0.25s ease; }
 
-  .upload-bar-track {
-    height: 4px;
-    background: var(--surface2);
-    border-radius: 100px;
-    overflow: hidden;
-  }
-
-  .upload-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--accent), #9ec4aa);
-    border-radius: 100px;
-    transition: width 0.25s ease;
-  }
-
-  /* ════════════════════════════
-     INLINE PROGRESS (inside form)
-  ════════════════════════════ */
-  .adm-progress-wrap {
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 14px 16px;
-  }
-
-  .adm-progress-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 9px;
-  }
-
+  .adm-progress-wrap { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+  .adm-progress-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 9px; }
   .adm-progress-step { font-size: 0.75rem; color: var(--text-2); letter-spacing: 0.04em; }
   .adm-progress-pct  { font-size: 0.8rem; font-weight: 700; color: var(--accent); }
+  .adm-progress-track { height: 6px; background: var(--surface); border-radius: 100px; overflow: hidden; }
+  .adm-progress-fill { height: 100%; border-radius: 100px; background: linear-gradient(90deg, var(--accent) 0%, #a8d4b4 100%); transition: width 0.2s ease; position: relative; overflow: hidden; }
+  .adm-progress-fill::after { content: ''; position: absolute; top: 0; left: -100%; right: 0; bottom: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent); animation: shimmer 1.2s ease infinite; }
+  @keyframes shimmer { 0% { left: -100%; } 100% { left: 100%; } }
 
-  .adm-progress-track {
-    height: 6px;
-    background: var(--surface);
-    border-radius: 100px;
-    overflow: hidden;
-  }
-
-  .adm-progress-fill {
-    height: 100%;
-    border-radius: 100px;
-    background: linear-gradient(90deg, var(--accent) 0%, #a8d4b4 100%);
-    transition: width 0.2s ease;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .adm-progress-fill::after {
-    content: '';
-    position: absolute;
-    top: 0; left: -100%; right: 0; bottom: 0;
-    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
-    animation: shimmer 1.2s ease infinite;
-  }
-
-  @keyframes shimmer {
-    0%   { left: -100%; }
-    100% { left: 100%; }
-  }
-
-  /* ════════════════════════════
-     REST OF STYLES
-  ════════════════════════════ */
-  .adm-header {
-    max-width: 1000px;
-    margin: 0 auto 32px;
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 20px;
-  }
-
-  .adm-chip {
-    display: inline-flex;
-    align-items: center;
-    padding: 4px 12px;
-    background: var(--accent-dim);
-    border: 1px solid rgba(124,158,135,0.3);
-    border-radius: 100px;
-    font-size: 0.68rem;
-    font-weight: 500;
-    letter-spacing: 0.12em;
-    color: var(--accent);
-    text-transform: uppercase;
-    margin-bottom: 10px;
-  }
-
-  .adm-title {
-    font-size: clamp(2rem, 4vw, 3rem);
-    font-weight: 300;
-    letter-spacing: -0.04em;
-    color: var(--text);
-    line-height: 1;
-  }
-
+  .adm-header { max-width: 1000px; margin: 0 auto 32px; display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 20px; }
+  .adm-chip { display: inline-flex; align-items: center; padding: 4px 12px; background: var(--accent-dim); border: 1px solid rgba(124,158,135,0.3); border-radius: 100px; font-size: 0.68rem; font-weight: 500; letter-spacing: 0.12em; color: var(--accent); text-transform: uppercase; margin-bottom: 10px; }
+  .adm-title { font-size: clamp(2rem, 4vw, 3rem); font-weight: 300; letter-spacing: -0.04em; color: var(--text); line-height: 1; }
   .adm-stats { display: flex; gap: 16px; }
-
-  .adm-stat {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 14px 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    min-width: 80px;
-  }
-
+  .adm-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 20px; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 80px; }
   .adm-stat__num   { font-size: 1.4rem; font-weight: 600; color: var(--text); letter-spacing: -0.02em; }
   .adm-stat__label { font-size: 0.67rem; color: var(--text-3); letter-spacing: 0.1em; text-transform: uppercase; }
 
-  .adm-tabs {
-    max-width: 1000px;
-    margin: 0 auto 24px;
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 6px;
-  }
-
-  .adm-tab {
-    display: flex; align-items: center; gap: 7px;
-    padding: 9px 18px;
-    background: transparent; border: none; border-radius: 10px;
-    font-family: 'Jost', sans-serif;
-    font-size: 0.82rem; font-weight: 500;
-    color: var(--text-3); cursor: pointer;
-    transition: color 0.18s, background 0.18s;
-    text-transform: capitalize; letter-spacing: 0.02em;
-  }
+  .adm-tabs { max-width: 1000px; margin: 0 auto 24px; display: flex; gap: 6px; flex-wrap: wrap; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 6px; }
+  .adm-tab { display: flex; align-items: center; gap: 7px; padding: 9px 18px; background: transparent; border: none; border-radius: 10px; font-family: 'Jost', sans-serif; font-size: 0.82rem; font-weight: 500; color: var(--text-3); cursor: pointer; transition: color 0.18s, background 0.18s; text-transform: capitalize; letter-spacing: 0.02em; }
   .adm-tab svg { flex-shrink: 0; }
   .adm-tab:hover { color: var(--text-2); background: rgba(255,255,255,0.04); }
   .adm-tab--active { background: var(--surface2); color: var(--text); border: 1px solid var(--border-hi); }
 
-  .adm-section {
-    max-width: 1000px;
-    margin: 0 auto;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-  }
-
-  .adm-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 18px;
-    padding: 28px;
-    position: relative;
-    overflow: hidden;
-  }
-  .adm-card::before {
-    content: '';
-    position: absolute; inset: 0;
-    border-radius: 18px;
-    background: linear-gradient(135deg, rgba(255,255,255,0.025) 0%, transparent 50%);
-    pointer-events: none;
-  }
-
-  .adm-card__title {
-    font-size: 1rem; font-weight: 600; color: var(--text);
-    letter-spacing: -0.01em; margin-bottom: 20px;
-    display: flex; align-items: center; gap: 10px;
-  }
-  .adm-card__titlerow {
-    display: flex; align-items: center; justify-content: space-between;
-    flex-wrap: wrap; gap: 12px; margin-bottom: 20px;
-  }
+  .adm-section { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+  .adm-card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 28px; position: relative; overflow: hidden; }
+  .adm-card::before { content: ''; position: absolute; inset: 0; border-radius: 18px; background: linear-gradient(135deg, rgba(255,255,255,0.025) 0%, transparent 50%); pointer-events: none; }
+  .adm-card__title { font-size: 1rem; font-weight: 600; color: var(--text); letter-spacing: -0.01em; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; }
+  .adm-card__titlerow { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
   .adm-card__titlerow .adm-card__title { margin-bottom: 0; }
-  .adm-card__count {
-    font-size: 0.75rem; font-weight: 400; color: var(--text-3);
-    background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 100px; padding: 2px 10px; letter-spacing: 0.04em;
-  }
+  .adm-card__count { font-size: 0.75rem; font-weight: 400; color: var(--text-3); background: var(--surface2); border: 1px solid var(--border); border-radius: 100px; padding: 2px 10px; letter-spacing: 0.04em; }
 
   .adm-stack { display: flex; flex-direction: column; gap: 18px; }
   .adm-row   { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
@@ -1114,36 +807,16 @@ const css = `
   }
 
   .adm-field { display: flex; flex-direction: column; gap: 7px; }
-  .adm-label {
-    font-size: 0.68rem; font-weight: 500; letter-spacing: 0.14em;
-    color: var(--text-3); text-transform: uppercase;
-  }
+  .adm-label { font-size: 0.68rem; font-weight: 500; letter-spacing: 0.14em; color: var(--text-3); text-transform: uppercase; }
   .adm-label__hint { font-weight: 400; color: var(--accent); text-transform: none; letter-spacing: 0; font-size: 0.7rem; }
 
-  .adm-input {
-    width: 100%; padding: 11px 14px;
-    background: var(--surface2); border: 1px solid var(--border);
-    border-radius: 10px;
-    font-family: 'Jost', sans-serif; font-size: 0.88rem; font-weight: 300; color: var(--text);
-    transition: border-color 0.2s, box-shadow 0.2s;
-  }
+  .adm-input { width: 100%; padding: 11px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; font-family: 'Jost', sans-serif; font-size: 0.88rem; font-weight: 300; color: var(--text); transition: border-color 0.2s, box-shadow 0.2s; }
   .adm-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
   .adm-input::placeholder { color: var(--text-3); }
   .adm-textarea { min-height: 90px; resize: vertical; }
-  .adm-select {
-    cursor: pointer; appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23545a66' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px;
-  }
+  .adm-select { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23545a66' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
 
-  .adm-file-label {
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 9px 18px;
-    background: var(--surface2); border: 1px dashed var(--border-hi);
-    border-radius: 10px;
-    font-size: 0.8rem; font-weight: 500; color: var(--text-2); cursor: pointer;
-    transition: border-color 0.2s, color 0.2s;
-  }
+  .adm-file-label { display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px; background: var(--surface2); border: 1px dashed var(--border-hi); border-radius: 10px; font-size: 0.8rem; font-weight: 500; color: var(--text-2); cursor: pointer; transition: border-color 0.2s, color 0.2s; }
   .adm-file-label:hover { border-color: var(--accent); color: var(--accent); }
 
   .adm-previews { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
@@ -1152,14 +825,7 @@ const css = `
   .adm-preview__badge { position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); font-size: 0.6rem; background: var(--accent); color: #0f1117; padding: 2px 6px; border-radius: 100px; font-weight: 600; white-space: nowrap; }
   .adm-preview__remove { position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; background: var(--danger); color: #fff; border: none; border-radius: 50%; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
 
-  .adm-btn {
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 10px 22px; border: none; border-radius: 100px;
-    font-family: 'Jost', sans-serif; font-size: 0.78rem; font-weight: 600;
-    letter-spacing: 0.06em; cursor: pointer;
-    transition: opacity 0.18s, transform 0.18s, box-shadow 0.18s;
-    white-space: nowrap;
-  }
+  .adm-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; border: none; border-radius: 100px; font-family: 'Jost', sans-serif; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; cursor: pointer; transition: opacity 0.18s, transform 0.18s, box-shadow 0.18s; white-space: nowrap; }
   .adm-btn:hover:not(:disabled) { opacity: 0.82; transform: translateY(-1px); }
   .adm-btn:disabled { opacity: 0.45; cursor: not-allowed; }
   .adm-btn--primary { background: var(--accent); color: #0f1117; }
@@ -1173,7 +839,6 @@ const css = `
   @keyframes admSpin { to { transform: rotate(360deg); } }
 
   .adm-hint { font-size: 0.78rem; color: var(--text-3); line-height: 1.6; margin-bottom: 20px; letter-spacing: 0.02em; }
-
   .adm-info-box { display: flex; gap: 14px; align-items: flex-start; background: rgba(124,158,135,0.07); border: 1px solid rgba(124,158,135,0.2); border-radius: 14px; padding: 18px 20px; font-size: 0.82rem; color: var(--text-2); line-height: 1.65; }
   .adm-info-box svg { flex-shrink: 0; color: var(--accent); margin-top: 2px; }
   .adm-info-box strong { color: var(--text); display: block; margin-bottom: 5px; font-weight: 600; }
@@ -1202,53 +867,40 @@ const css = `
   .adm-banner-heading { font-weight: 600; font-size: 0.9rem; color: var(--text); }
   .adm-banner-meta    { display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.75rem; color: var(--text-3); }
   .adm-banner-meta b  { color: var(--text-2); font-weight: 500; }
-
   .adm-link-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: var(--accent-dim); border: 1px solid rgba(124,158,135,0.25); border-radius: 100px; color: var(--accent); font-size: 0.72rem; }
   .adm-link-badge--none { background: var(--surface); border-color: var(--border); color: var(--text-3); }
   .adm-link-badge code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
 
   .adm-orders { display: flex; flex-direction: column; gap: 10px; }
-
   .adm-order { background: var(--surface2); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; transition: border-color 0.2s; }
   .adm-order:hover { border-color: var(--border-hi); }
   .adm-order--open { border-color: var(--border-hi); }
-
   .adm-order__head { width: 100%; display: flex; align-items: center; gap: 16px; padding: 16px 20px; background: transparent; border: none; cursor: pointer; text-align: left; flex-wrap: wrap; }
-
   .adm-order__id   { display: flex; flex-direction: column; gap: 2px; min-width: 100px; }
   .adm-order__num  { font-weight: 600; font-size: 0.9rem; color: var(--text); letter-spacing: 0.02em; }
   .adm-order__date { font-size: 0.7rem; color: var(--text-3); }
   .adm-order__user { flex: 1; font-size: 0.78rem; color: var(--text-3); }
   .adm-order__right { display: flex; align-items: center; gap: 12px; margin-left: auto; }
-
   .adm-status-pill { display: inline-flex; align-items: center; padding: 4px 12px; border-radius: 100px; font-size: 0.68rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
   .adm-order__total { font-weight: 600; font-size: 0.95rem; color: var(--text); }
-
   .adm-chevron { color: var(--text-3); transition: transform 0.25s; display: flex; }
   .adm-chevron--open { transform: rotate(180deg); }
-
   .adm-order__body { max-height: 0; overflow: hidden; transition: max-height 0.35s cubic-bezier(.22,1,.36,1); }
   .adm-order__body--open { max-height: 500px; }
   .adm-order__body-inner { padding: 20px; border-top: 1px solid var(--border); }
-
   .adm-order__cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
   @media (max-width: 560px) { .adm-order__cols { grid-template-columns: 1fr; } }
-
   .adm-section-label { font-size: 0.65rem; font-weight: 600; letter-spacing: 0.16em; color: var(--text-3); text-transform: uppercase; margin-bottom: 12px; }
-
   .adm-order__item { display: flex; align-items: center; gap: 9px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.83rem; }
   .adm-order__item:last-child { border-bottom: none; }
   .adm-item-dot         { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); opacity: 0.6; flex-shrink: 0; }
   .adm-order__item-name  { flex: 1; color: var(--text); }
   .adm-order__item-qty   { color: var(--text-3); font-size: 0.75rem; }
   .adm-order__item-price { font-weight: 600; color: var(--text); }
-
   .adm-delivery-row { display: flex; align-items: flex-start; gap: 8px; font-size: 0.8rem; color: var(--text-2); padding: 7px 0; border-bottom: 1px solid var(--border); line-height: 1.5; }
   .adm-delivery-row:last-of-type { border-bottom: none; }
   .adm-delivery-row svg { flex-shrink: 0; color: var(--text-3); margin-top: 2px; }
-
   .adm-status-select { padding: 9px 36px 9px 14px; background: var(--surface); border-radius: 10px; font-family: 'Jost', sans-serif; font-size: 0.82rem; font-weight: 600; cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23545a66' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; transition: border-color 0.2s, box-shadow 0.2s; }
   .adm-status-select:focus { outline: none; box-shadow: 0 0 0 3px var(--accent-glow); }
-
   .adm-empty { font-size: 0.85rem; color: var(--text-3); padding: 20px 0; letter-spacing: 0.02em; }
 `;
