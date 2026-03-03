@@ -13,7 +13,7 @@
   },
   "upload_source_maps": true,
   "vars": {
-    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_c2hpbmluZy13aGFsZS05Ni5jbGVyay5hY2NvdW50cy5kZXYk"
+    "NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_live_Y2xlcmsuY3Jhc2hjYXJ0LnNob3Ak"
   },
     
   "d1_databases": [
@@ -22,13 +22,5 @@
       "database_name": "crash-card-prod-db",
       "database_id": "5a26386c-d5ed-4b62-abc2-ebcdb28df137"
     }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "R2_BUCKET",
-      "bucket_name": "banner-data",
-
-    }
   ]
-  
 }
