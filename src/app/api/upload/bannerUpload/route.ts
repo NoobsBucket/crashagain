@@ -67,6 +67,9 @@ async function signAndUpload(
   contentType: string
 ): Promise<void> {
   const url       = `${R2_ENDPOINT}/${R2_BUCKET}/${fileName}`;
+  console.log("[bannerUpload] R2_ENDPOINT:", R2_ENDPOINT);
+console.log("[bannerUpload] R2_BUCKET:", R2_BUCKET);
+console.log("[bannerUpload] Upload URL:", url);
   const now       = new Date();
   const datestamp = now.toISOString().slice(0, 10).replace(/-/g, "");
   const amzdate   = now.toISOString().replace(/[:-]|\.\d{3}/g, "").slice(0, 15) + "Z";
