@@ -1,7 +1,7 @@
 export const runtime = 'nodejs';
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { createSupabaseServerClient } from "@/lib/supabase";
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 
 function getDB() {
@@ -16,16 +16,17 @@ function getDB() {
 
 const isDev = process.env.NODE_ENV === 'development';
 
-// ── GET reviews for a product — public ───────────────────────────
+async function getUser() {
+  const supabase = await createSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  return user;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const db = getDB();
-    const { searchParams } = new URL(req.url);
-    const productId = searchParams.get('product_id');
-
-    if (!productId) {
-      return NextResponse.json({ error: 'product_id is required' }, { status: 400 });
-    }
+    const productId = new URL(req.url).searchParams.get('product_id');
+    if (!productId) return NextResponse.json({ error: 'product_id is required' }, { status: 400 });
 
     const sql = 'SELECT * FROM reviews WHERE product_id = ? ORDER BY created_at DESC';
     const results = isDev
@@ -39,26 +40,17 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// ── POST a review — must be logged in ────────────────────────────
 export async function POST(req: NextRequest) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: 'You must be logged in to leave a review' }, { status: 401 });
-    }
+    const user = await getUser();
+    if (!user) return NextResponse.json({ error: 'You must be logged in to leave a review' }, { status: 401 });
 
-    const client = await clerkClient();
-    const user = await client.users.getUser(userId);
-    const user_name =
-      user?.firstName && user?.lastName
-        ? `${user.firstName} ${user.lastName}`
-        : user?.firstName || user?.emailAddresses?.[0]?.emailAddress || 'Anonymous';
+    const userId = user.id;
+    const user_name = user.user_metadata?.full_name ?? user.user_metadata?.name ?? user.email?.split('@')[0] ?? 'Anonymous';
 
     const db = getDB();
     const { product_id, rating, comment } = (await req.json()) as {
-      product_id: number;
-      rating: number;
-      comment: string;
+      product_id: number; rating: number; comment: string;
     };
 
     if (!product_id || !rating || !comment?.trim()) {
@@ -87,40 +79,27 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ── DELETE a review — only by the author ─────────────────────────
 export async function DELETE(req: NextRequest) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const user = await getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const db = getDB();
-
     let body: { id?: unknown };
-    try {
-      body = await req.json();
-    } catch {
-      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-    }
+    try { body = await req.json(); }
+    catch { return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 }); }
 
     const id = Number(body?.id);
-    if (!id || isNaN(id)) {
-      return NextResponse.json({ error: 'A valid numeric id is required' }, { status: 400 });
-    }
+    if (!id || isNaN(id)) return NextResponse.json({ error: 'A valid numeric id is required' }, { status: 400 });
 
     if (isDev) {
       const review = db.prepare('SELECT * FROM reviews WHERE id = ?').get(id);
-      if (!review || review.user_id !== userId) {
-        return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
-      }
+      if (!review || review.user_id !== user.id) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
       db.prepare('DELETE FROM reviews WHERE id = ?').run(id);
     } else {
       const res = await db.prepare('SELECT * FROM reviews WHERE id = ?').bind(id).all();
       const review = res.results?.[0] as { user_id: string } | undefined;
-      if (!review || review.user_id !== userId) {
-        return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
-      }
+      if (!review || review.user_id !== user.id) return NextResponse.json({ error: 'Not allowed' }, { status: 403 });
       await db.prepare('DELETE FROM reviews WHERE id = ?').bind(id).run();
     }
 

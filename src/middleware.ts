@@ -1,49 +1,77 @@
-export const runtime = 'experimental-edge'
-import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
+export const runtime = 'experimental-edge';
 
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
 
-const ADMIN_EMAILS = ["nbdotwork@gmail.com", "msdotxd1@gmail.com" ,"halayjan18@gmail.com"];
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS ?? "").split(",").map(e => e.trim());
 
-const isPublicRoute = createRouteMatcher([
-  "/",
-  "/products(.*)",
-  "/api/products(.*)",
-  "/api/categories(.*)",
-  "/api/banners(.*)",
-  "/api/reviews(.*)",
-  "/login(.*)",
-  "/checkout(.*)",
-  "/orders(.*)",
-  "/register(.*)",
-  "/search(.*)",
-  "/api/search(.*)",
-]);
+const PUBLIC_ROUTES = [
+  /^\/$/, 
+  /^\/products/,
+  /^\/api\/products/,
+  /^\/api\/categories/,
+  /^\/api\/banners/,
+  /^\/api\/reviews/,
+  /^\/login/,
+  /^\/checkout/,
+  /^\/orders/,
+  /^\/register/,
+  /^\/search/,
+  /^\/api\/search/,
+  /^\/auth/,
+  /^\/api\/auth/,
+];
 
-const isAdminRoute = createRouteMatcher([
-  "/admin(.*)",
-  "/api/admin(.*)",
-]);
+const ADMIN_ROUTES = [
+  /^\/admin/,
+  /^\/api\/admin/,
+];
 
-export default clerkMiddleware(async (auth, request) => {
+function isPublicRoute(pathname: string) {
+  return PUBLIC_ROUTES.some(r => r.test(pathname));
+}
 
-  if (isAdminRoute(request)) {
-    const { userId, sessionClaims } = await auth();
-    if (!userId) {
-      const signInUrl = new URL("/", request.url);
-      return NextResponse.redirect(signInUrl);
+function isAdminRoute(pathname: string) {
+  return ADMIN_ROUTES.some(r => r.test(pathname));
+}
+
+export default async function middleware(request: NextRequest) {
+  const response = NextResponse.next({ request });
+  const { pathname } = request.nextUrl;
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return request.cookies.getAll(); },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set(name, value);
+            response.cookies.set(name, value, options);
+          });
+        },
+      },
     }
-    const email = sessionClaims?.email as string | undefined;
-    if (!email || !ADMIN_EMAILS.includes(email)) {
-      const homeUrl = new URL("/", request.url);
-      return NextResponse.redirect(homeUrl);
+  );
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (isAdminRoute(pathname)) {
+    if (!user) return NextResponse.redirect(new URL('/', request.url));
+    if (!ADMIN_EMAILS.includes(user.email ?? '')) {
+      return NextResponse.redirect(new URL('/', request.url));
     }
-    return NextResponse.next();
+    return response;
   }
-  if (!isPublicRoute(request)) {
-    await auth.protect();
+
+  if (!isPublicRoute(pathname) && !user) {
+    return NextResponse.redirect(new URL('/', request.url));
   }
-});
+
+  return response;
+}
+
 export const config = {
   matcher: [
     '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',

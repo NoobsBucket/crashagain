@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useUser, SignInButton } from "@clerk/nextjs";
+import { createBrowserClient } from "@supabase/ssr";
 import Navbar from "@/components/navbar";
 
 type OrderItem = { id: number; product_name: string; price: number; quantity: number };
@@ -29,27 +29,76 @@ const STATUS: Record<string, { color: string; bg: string; border: string; label:
 const STATUS_STEPS = ["pending", "confirmed", "shipped", "delivered"];
 
 export default function OrdersPage() {
-  const { isSignedIn } = useUser();
   const router = useRouter();
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+  const [isSignedIn, setIsSignedIn] = useState<boolean | null>(null); // null = checking
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<number | null>(null);
-type OrdersResponse = {
-  results: any[]; // replace with your real Order type if you have one
-};
 
-useEffect(() => {
-  if (!isSignedIn) return;
+  useEffect(() => {
+    const init = async () => {
+      // 1. Check session
+      const { data: { session } } = await supabase.auth.getSession();
 
-  fetch("/api/orders", { credentials: "include" })
-    .then(res => res.json() as Promise<OrdersResponse>)
-    .then(data => {
-      setOrders(data.results || []);
+      if (!session) {
+        setIsSignedIn(false);
+        setLoading(false);
+        return;
+      }
+
+      setIsSignedIn(true);
+
+      // 2. Fetch orders belonging to this user
+      const { data, error } = await supabase
+        .from("orders")
+        .select(`
+          id,
+          total,
+          status,
+          address,
+          city,
+          phone,
+          created_at,
+          items:order_items (
+            id,
+            product_name,
+            price,
+            quantity
+          )
+        `)
+        .eq("user_id", session.user.id)
+        .order("created_at", { ascending: false });
+
+      if (!error && data) {
+        setOrders(data as Order[]);
+      }
+
       setLoading(false);
+    };
+
+    init();
+
+    // 3. Listen for auth changes (e.g. sign-out)
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        setIsSignedIn(false);
+        setOrders([]);
+      }
     });
-}, [isSignedIn]);
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
 
   const toggle = (id: number) => setExpanded(prev => prev === id ? null : id);
+
+  const handleSignIn = () => router.push("/sign-in"); // adjust to your sign-in route
+
+  /* ── Checking auth ── */
+  if (isSignedIn === null) return null; // or a full-page spinner
 
   /* ── Not signed in ── */
   if (!isSignedIn) return (
@@ -62,9 +111,7 @@ useEffect(() => {
           <h2 className="display-lg" style={{ marginTop: 16 }}>Sign in to continue</h2>
           <p className="muted-body">View your order history and track deliveries.</p>
           <div className="btn-row" style={{ marginTop: 36 }}>
-            <SignInButton mode="modal">
-              <button className="btn-primary">Sign In</button>
-            </SignInButton>
+            <button className="btn-primary" onClick={handleSignIn}>Sign In</button>
           </div>
         </div>
       </div>
@@ -136,7 +183,7 @@ useEffect(() => {
             return (
               <div
                 key={order.id}
-                className={`order-card anim-card`}
+                className="order-card anim-card"
                 style={{ animationDelay: `${idx * 0.07}s` }}
               >
                 {/* ── Card Header ── */}
@@ -271,7 +318,6 @@ const css = `
   .anim-1    { animation: fadeUp 0.55s cubic-bezier(.22,1,.36,1) both; }
   .anim-card { opacity: 0; animation: fadeUp 0.5s cubic-bezier(.22,1,.36,1) forwards; }
 
-  /* ── Page ── */
   .page {
     min-height: 100vh;
     background:
@@ -282,7 +328,6 @@ const css = `
     font-family: var(--body);
   }
 
-  /* ── Page header ── */
   .page-header {
     max-width: 780px;
     margin: 0 auto 36px;
@@ -314,7 +359,6 @@ const css = `
     letter-spacing: 0.04em;
   }
 
-  /* ── Chip ── */
   .chip {
     display: inline-flex;
     align-items: center;
@@ -329,7 +373,6 @@ const css = `
     text-transform: uppercase;
   }
 
-  /* ── Solo card ── */
   .solo-card {
     max-width: 500px;
     margin: 60px auto 0;
@@ -348,7 +391,6 @@ const css = `
     pointer-events: none;
   }
 
-  /* ── Empty icon ── */
   .empty-icon {
     width: 60px; height: 60px;
     border-radius: 50%;
@@ -357,7 +399,6 @@ const css = `
     color: var(--text-3);
   }
 
-  /* ── Buttons ── */
   .btn-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 
   .btn-primary {
@@ -376,7 +417,6 @@ const css = `
   }
   .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px var(--accent-glow); }
 
-  /* ── Muted body ── */
   .muted-body {
     font-size: 0.92rem;
     color: var(--text-2);
@@ -385,7 +425,6 @@ const css = `
     max-width: 360px;
   }
 
-  /* ── Skeleton ── */
   .skeleton-card {
     height: 80px;
     background: var(--surface);
@@ -395,7 +434,6 @@ const css = `
     animation: pulse 1.6s ease-in-out infinite;
   }
 
-  /* ── Orders list ── */
   .orders-list {
     max-width: 780px;
     margin: 0 auto;
@@ -404,7 +442,6 @@ const css = `
     gap: 14px;
   }
 
-  /* ── Order card ── */
   .order-card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -414,7 +451,6 @@ const css = `
   }
   .order-card:hover { border-color: var(--border-hi); }
 
-  /* ── Order header button ── */
   .order-header {
     width: 100%;
     display: flex;
@@ -485,7 +521,6 @@ const css = `
   }
   .chevron.open { transform: rotate(180deg); }
 
-  /* ── Progress tracker ── */
   .progress-wrap {
     display: flex;
     align-items: flex-start;
@@ -537,7 +572,6 @@ const css = `
   }
   .progress-line.done { background: var(--accent); }
 
-  /* ── Expandable body ── */
   .order-body {
     max-height: 0;
     overflow: hidden;
@@ -561,7 +595,6 @@ const css = `
     .progress-wrap { display: none; }
   }
 
-  /* ── Section label ── */
   .section-label {
     font-size: 0.65rem;
     font-weight: 500;
@@ -571,7 +604,6 @@ const css = `
     margin-bottom: 14px;
   }
 
-  /* ── Item row ── */
   .item-row {
     display: flex;
     align-items: center;
@@ -598,9 +630,6 @@ const css = `
     color: var(--text);
   }
 
-  /* ── Delivery section ── */
-  .delivery-section { }
-
   .delivery-row {
     display: flex;
     align-items: flex-start;
@@ -614,7 +643,6 @@ const css = `
   .delivery-row:last-child { border-bottom: none; }
   .delivery-row svg { flex-shrink: 0; margin-top: 2px; color: var(--text-3); }
 
-  /* ── Responsive ── */
   @media (max-width: 600px) {
     .page { padding: 40px 14px 80px; }
     .solo-card { padding: 32px 20px; margin-top: 32px; }
