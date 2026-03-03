@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ── PATCH update order status ─────────────────────────────────────
+
 export async function PATCH(req: NextRequest) {
   try {
     const { userId } = await auth();

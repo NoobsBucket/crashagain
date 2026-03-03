@@ -13,8 +13,6 @@ function getDB() {
 }
 
 const isDev = process.env.NODE_ENV === "development";
-
-// ── GET ──────────────────────────────────────────────────────────
 export async function GET() {
   try {
     const db = getDB();
@@ -30,7 +28,6 @@ export async function GET() {
   }
 }
 
-// ── POST ─────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
     const db = getDB();
@@ -59,7 +56,7 @@ export async function POST(req: NextRequest) {
       const result = db.prepare(sql).run(...params);
       id = result.lastInsertRowid;
     } else {
-      // D1: must use .bind(...args).run(), NOT .run(...args)
+     
       const result = await db.prepare(sql).bind(...params).run();
       id = result.meta?.last_row_id;
     }
@@ -71,7 +68,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// ── DELETE ────────────────────────────────────────────────────────
+// ── DELETE 
 export async function DELETE(req: NextRequest) {
   try {
     const db = getDB();
