@@ -1,75 +1,152 @@
-export {};
-export const dynamic = 'force-dynamic'
-declare global {
-  var env: {
-    DB: D1Database;
-  };
-}
+export const runtime = "nodejs";
 
-interface D1Database {
-  prepare: (query: string) => {
-    run: (...args: unknown[]) => { lastInsertRowid?: number };
-    all: () => { results: unknown[] };
-  };
-}
+import { NextRequest, NextResponse } from "next/server";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 function getDB() {
-  if (process.env.NODE_ENV === 'development') {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3');
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const path = require('path');
-    return new Database(path.join(process.cwd(), 'local.db'));
+  if (process.env.NODE_ENV === "development") {
+    const Database = require("better-sqlite3");
+    const path = require("path");
+    return new Database(path.join(process.cwd(), "local.db"));
   }
-  // Production — Cloudflare D1
-  return (globalThis as any).env?.DB ?? (process.env as any).DB;
+  const { env } = getCloudflareContext();
+  if (!env.DB) console.error("DEBUG: env.DB is undefined!");
+  return env.DB;
 }
 
-// --- POST: add a new category ---
-export const POST = async (req: Request) => {
+// ---------------------------
+// GET all products
+// ---------------------------
+export async function GET(req: NextRequest) {
   try {
     const db = getDB();
-    const { name, slug } = await req.json() as { name: string; slug: string };
+    const { searchParams } = new URL(req.url);
+    const categoryId = searchParams.get("category_id");
+    const productId = searchParams.get("id");
 
-    if (!name || !slug) {
-      return new Response(JSON.stringify({ error: "Please provide both name and slug" }), { status: 400 });
+    const isDev = process.env.NODE_ENV === "development";
+
+    if (productId) {
+      // Single product
+      let product, images;
+      if (isDev) {
+        product = db.prepare("SELECT * FROM products WHERE id = ?").get(productId);
+        images = db.prepare("SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order ASC").all(productId);
+      } else {
+        const pr = await db.prepare("SELECT * FROM products WHERE id = ?").bind(productId).all();
+        product = pr.results[0];
+        const ir = await db.prepare("SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order ASC").bind(productId).all();
+        images = ir.results;
+      }
+      console.log("DEBUG GET single product:", { product, images });
+      return NextResponse.json({ product: { ...product, images } });
     }
 
-    let result;
-    if (process.env.NODE_ENV === 'development') {
-      result = db.prepare("INSERT INTO categories (name, slug) VALUES (?, ?)").run(name, slug);
+    // All products
+    let products;
+    const baseQuery = `
+      SELECT p.*, 
+        (SELECT image_url FROM product_images WHERE product_id = p.id ORDER BY sort_order ASC LIMIT 1) AS image_url
+      FROM products p
+    `;
+    const orderBy = " ORDER BY p.created_at DESC";
+
+    if (isDev) {
+      if (categoryId) {
+        products = db.prepare(baseQuery + " WHERE p.category_id = ?" + orderBy).all(categoryId);
+      } else {
+        products = db.prepare(baseQuery + orderBy).all();
+      }
     } else {
-      result = await db.prepare("INSERT INTO categories (name, slug) VALUES (?, ?)").run(name, slug);
+      const query = categoryId ? baseQuery + " WHERE p.category_id = ?" + orderBy : baseQuery + orderBy;
+      const res = categoryId
+        ? await db.prepare(query).bind(categoryId).all()
+        : await db.prepare(query).all();
+      products = res.results;
     }
 
-    return new Response(JSON.stringify({
-      success: true,
-      category: { id: result.lastInsertRowid, name, slug }
-    }), { status: 200 });
-
+    console.log("DEBUG GET all products:", products);
+    return NextResponse.json({ results: products });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Internal Server Error";
-    return new Response(JSON.stringify({ error: message }), { status: 500 });
+    console.error("DEBUG GET ERROR:", err);
+    const message = err instanceof Error ? err.message : JSON.stringify(err);
+    return NextResponse.json({ error: `Failed to fetch products: ${message}` }, { status: 500 });
   }
-};
+}
 
-// --- GET: fetch all categories ---
-export const GET = async () => {
+// ---------------------------
+// POST create product
+// ---------------------------
+export async function POST(req: NextRequest) {
   try {
     const db = getDB();
+    const { name, price, description, category_id, image_urls } = await req.json() as {
+      name: string;
+      price: number;
+      description: string;
+      category_id: number;
+      image_urls?: string[];
+    };
 
-    let results;
-    if (process.env.NODE_ENV === 'development') {
-      results = db.prepare("SELECT * FROM categories ORDER BY created_at DESC").all();
-    } else {
-      const res = await db.prepare("SELECT * FROM categories ORDER BY created_at DESC").all();
-      results = res.results;
+    if (!name || !price || !category_id) {
+      return NextResponse.json({ error: "name, price and category_id are required" }, { status: 400 });
     }
 
-    return new Response(JSON.stringify({ results }), { status: 200 });
+    const isDev = process.env.NODE_ENV === "development";
+    let productId: number;
 
+    if (isDev) {
+      const result = db.prepare("INSERT INTO products (name, price, description, category_id) VALUES (?, ?, ?, ?)").run(name, price, description || "", category_id);
+      productId = result.lastInsertRowid;
+
+      if (image_urls?.length) {
+        const stmt = db.prepare("INSERT INTO product_images (product_id, image_url, sort_order) VALUES (?, ?, ?)");
+        image_urls.forEach((url, i) => stmt.run(productId, url, i));
+      }
+    } else {
+      const result = await db.prepare("INSERT INTO products (name, price, description, category_id) VALUES (?, ?, ?, ?)").bind(name, price, description || "", category_id).run();
+      productId = result.meta?.last_row_id ?? 0;
+
+      if (image_urls?.length) {
+        for (let i = 0; i < image_urls.length; i++) {
+          await db.prepare("INSERT INTO product_images (product_id, image_url, sort_order) VALUES (?, ?, ?)").bind(productId, image_urls[i], i).run();
+        }
+      }
+    }
+
+    console.log("DEBUG POST product created:", { productId, name, price, category_id });
+    return NextResponse.json({ success: true, product: { id: productId, name, price, description, category_id } });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Internal Server Error";
-    return new Response(JSON.stringify({ error: message }), { status: 500 });
+    console.error("DEBUG POST ERROR:", err);
+    const message = err instanceof Error ? err.message : JSON.stringify(err);
+    return NextResponse.json({ error: `Failed to create product: ${message}` }, { status: 500 });
   }
-};
+}
+
+// ---------------------------
+// DELETE product
+// ---------------------------
+export async function DELETE(req: NextRequest) {
+  try {
+    const db = getDB();
+    const { id } = await req.json() as { id: number };
+    if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
+
+    const isDev = process.env.NODE_ENV === "development";
+
+    if (isDev) {
+      db.prepare("DELETE FROM product_images WHERE product_id = ?").run(id);
+      db.prepare("DELETE FROM products WHERE id = ?").run(id);
+    } else {
+      await db.prepare("DELETE FROM product_images WHERE product_id = ?").bind(id).run();
+      await db.prepare("DELETE FROM products WHERE id = ?").bind(id).run();
+    }
+
+    console.log("DEBUG DELETE product:", id);
+    return NextResponse.json({ success: true });
+  } catch (err: unknown) {
+    console.error("DEBUG DELETE ERROR:", err);
+    const message = err instanceof Error ? err.message : JSON.stringify(err);
+    return NextResponse.json({ error: `Failed to delete product: ${message}` }, { status: 500 });
+  }
+}
