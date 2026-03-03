@@ -17,7 +17,6 @@ export default function FloatingCart() {
 
   return (
     <>
-      {/* Floating Button */}
       <button
         className={style.floatingCart}
         onClick={() => setIsOpen(true)}
