@@ -82,12 +82,10 @@ export async function DELETE(req: NextRequest) {
     } catch {
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
-
     const id = Number(body?.id);
     if (!id || isNaN(id)) {
       return NextResponse.json({ error: "A valid numeric id is required" }, { status: 400 });
     }
-
     const sql = "DELETE FROM banners WHERE id = ?";
     if (isDev) {
       db.prepare(sql).run(id);
