@@ -215,7 +215,7 @@ export default function OrdersPage() {
                           <div className="item-dot" />
                           <span className="item-name">{item.product_name}</span>
                           <span className="item-qty">×{item.quantity}</span>
-                          <span className="item-price">${(item.price * item.quantity).toFixed(2)}</span>
+                          <span className="item-price">RS {(item.price * item.quantity).toFixed(2)}</span>
                         </div>
                       ))}
                     </div>

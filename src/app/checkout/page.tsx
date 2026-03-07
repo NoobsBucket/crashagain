@@ -226,7 +226,7 @@ export default function CheckoutPage() {
                     <span className="item-name">{item.name}</span>
                     <span className="item-meta">Qty {item.quantity} · ${item.price.toFixed(2)} each</span>
                   </div>
-                  <span className="item-price">${(item.price * item.quantity).toFixed(2)}</span>
+                  <span className="item-price">RS {(item.price * item.quantity).toFixed(2)}</span>
                 </div>
               ))}
             </div>
@@ -242,7 +242,7 @@ export default function CheckoutPage() {
               </div>
               <div className="totals-final">
                 <span>Total</span>
-                <span>${totalPrice.toFixed(2)}</span>
+                <span>RS {totalPrice.toFixed(2)}</span>
               </div>
             </div>
 
@@ -254,7 +254,7 @@ export default function CheckoutPage() {
               {placing ? (
                 <><span className="spinner" /> Processing…</>
               ) : (
-                `Place Order — $${totalPrice.toFixed(2)}`
+                `Place Order — ${totalPrice.toFixed(2)}`
               )}
             </button>
 

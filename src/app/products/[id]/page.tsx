@@ -214,7 +214,7 @@ export default function ProductDetailPage() {
                     <span style={{ fontSize: "0.82rem", color: "#999" }}>{avgRating.toFixed(1)} · {reviews.length} review{reviews.length !== 1 ? "s" : ""}</span>
                   </div>
                 )}
-                <div style={{ fontSize: "1.9rem", fontWeight: 800, color: "#1a1a18", marginBottom: 20, letterSpacing: "-0.02em" }}>${product.price.toFixed(2)}</div>
+                <div style={{ fontSize: "1.9rem", fontWeight: 800, color: "#1a1a18", marginBottom: 20, letterSpacing: "-0.02em" }}>RS {product.price.toFixed(2)}</div>
                 <div style={{ height: 1, background: "linear-gradient(to right, #ddd8d0, transparent)", marginBottom: 20 }} />
                 {product.description && (
                   <p style={{ margin: "0 0 24px", color: "#6b6560", lineHeight: 1.8, fontSize: "0.93rem" }}>{product.description}</p>
