@@ -41,7 +41,6 @@ export default function ProductDetailPage() {
   const router = useRouter();
   const { addToCart } = useCart();
 
-  // ── Supabase ──
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -57,13 +56,13 @@ export default function ProductDetailPage() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // ── Product & reviews ──
-  const [product, setProduct]   = useState<Product | null>(null);
+  const [product, setProduct]     = useState<Product | null>(null);
   const [activeImg, setActiveImg] = useState(0);
-  const [added, setAdded]       = useState(false);
-  const [reviews, setReviews]   = useState<Review[]>([]);
-  const [rating, setRating]     = useState(0);
-  const [comment, setComment]   = useState("");
+  const [imgExpanded, setImgExpanded] = useState(false); // ← expand state
+  const [added, setAdded]         = useState(false);
+  const [reviews, setReviews]     = useState<Review[]>([]);
+  const [rating, setRating]       = useState(0);
+  const [comment, setComment]     = useState("");
   const [submitting, setSubmitting] = useState(false);
   const reviewsRef = useRef<HTMLDivElement>(null);
 
@@ -82,6 +81,12 @@ export default function ProductDetailPage() {
   };
 
   useEffect(() => { fetchReviews(); }, [id]);
+
+  // reset expand when switching images
+  const handleThumbClick = (i: number) => {
+    setActiveImg(i);
+    setImgExpanded(false);
+  };
 
   const handleAdd = () => {
     if (!product) return;
@@ -150,6 +155,60 @@ export default function ProductDetailPage() {
         .pd-buy:hover { background: #b8722a !important; }
         .pd-back:hover { color: #1a1a18 !important; }
         .pd-review:hover { border-color: #c8824a !important; }
+
+        /* main image wrap — semi-vertical 4:5, object-position top */
+        .pd-main-img-wrap {
+          position: relative;
+          width: 100%;
+          aspect-ratio: 4 / 5;
+          border-radius: 20px;
+          overflow: hidden;
+          background: #ede9e3;
+          box-shadow: 0 4px 40px rgba(0,0,0,0.08);
+          cursor: zoom-in;
+          transition: aspect-ratio 0s;
+        }
+        .pd-main-img-wrap.expanded {
+          aspect-ratio: unset;
+          cursor: zoom-out;
+        }
+        .pd-main-img-wrap img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          object-position: top;
+          display: block;
+          transition: transform 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        .pd-main-img-wrap.expanded img {
+          height: auto;
+          object-fit: unset;
+          object-position: unset;
+        }
+        .pd-main-img-wrap:not(.expanded):hover img {
+          transform: scale(1.03);
+        }
+
+        /* expand hint */
+        .pd-expand-hint {
+          position: absolute;
+          bottom: 14px;
+          right: 14px;
+          z-index: 4;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          background: rgba(255,255,255,0.88);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          opacity: 0;
+          transition: opacity 0.2s ease;
+          pointer-events: none;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+        }
+        .pd-main-img-wrap:hover .pd-expand-hint { opacity: 1; }
+
         .pd-grid { display: flex; flex-direction: row; gap: 56px; align-items: flex-start; }
         .pd-img-col { flex: 1 1 420px; position: sticky; top: 24px; }
         .pd-info-col { flex: 1 1 320px; }
@@ -162,7 +221,7 @@ export default function ProductDetailPage() {
           .pd-btns { flex-direction: column !important; }
         }
         @media (max-width: 480px) {
-          .pd-main-img { aspect-ratio: 4/3 !important; border-radius: 0 !important; }
+          .pd-main-img-wrap { border-radius: 0 !important; }
           .pd-thumbs { padding: 0 16px !important; }
           .pd-info-inner { padding: 20px 16px !important; }
         }
@@ -181,19 +240,35 @@ export default function ProductDetailPage() {
           <div className="pd-grid">
             {/* ── Image Column ── */}
             <div className="pd-img-col">
-              <div className="pd-main-img" style={{ width: "100%", aspectRatio: "1/1", borderRadius: 20, overflow: "hidden", background: "#ede9e3", boxShadow: "0 4px 40px rgba(0,0,0,0.08)" }}>
-                <img key={images[activeImg].image_url} src={images[activeImg].image_url} alt={product.name}
-                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "opacity 0.3s" }} />
+
+              {/* Main image with expand on click */}
+              <div
+                className={`pd-main-img-wrap${imgExpanded ? " expanded" : ""}`}
+                onClick={() => setImgExpanded(v => !v)}
+              >
+                <img
+                  key={images[activeImg].image_url}
+                  src={images[activeImg].image_url}
+                  alt={product.name}
+                />
+                <span className="pd-expand-hint">
+                  {imgExpanded
+                    ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#18180f" strokeWidth="2.5" strokeLinecap="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>
+                    : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#18180f" strokeWidth="2.5" strokeLinecap="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                  }
+                </span>
               </div>
+
+              {/* Thumbnails */}
               {images.length > 1 && (
                 <div className="pd-thumbs" style={{ display: "flex", gap: 10, marginTop: 12, flexWrap: "wrap" }}>
                   {images.map((img, i) => (
-                    <div key={img.id} className="pd-thumb" onClick={() => setActiveImg(i)} style={{
+                    <div key={img.id} className="pd-thumb" onClick={() => handleThumbClick(i)} style={{
                       width: 64, height: 64, borderRadius: 10, overflow: "hidden", cursor: "pointer",
                       border: activeImg === i ? "2.5px solid #1a1a18" : "2.5px solid #e0dbd4",
                       opacity: activeImg === i ? 1 : 0.5, transition: "all 0.2s", flexShrink: 0
                     }}>
-                      <img src={img.image_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      <img src={img.image_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} />
                     </div>
                   ))}
                 </div>
@@ -291,7 +366,6 @@ export default function ProductDetailPage() {
                       </div>
                       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                         <span style={{ color: "#ccc", fontSize: "0.72rem" }}>{new Date(review.created_at).toLocaleDateString()}</span>
-                        {/* Match by Supabase user id */}
                         {user?.id === review.user_id && (
                           <button onClick={() => deleteReview(review.id)} style={{ background: "none", border: "none", color: "#e33", cursor: "pointer", fontSize: "0.72rem", padding: 0 }}>Delete</button>
                         )}

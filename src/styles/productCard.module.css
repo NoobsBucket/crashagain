@@ -3,7 +3,7 @@
 ════════════════════════════════════════ */
 .section {
   background: #f7f3ee;
-  padding: 40px 0 0;           /* removed bottom padding — handled by track */
+  padding: 28px 0 24px;        /* ← reduced from 56px/52px */
   font-family: "Jost", "Helvetica Neue", sans-serif;
   overflow-x: hidden;
 }
@@ -15,13 +15,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 40px 20px;
+  padding: 0 40px 16px;        /* ← reduced bottom padding */
   gap: 16px;
 }
 
 .sectionTitle {
   font-family: "Jost", "Helvetica Neue", sans-serif;
-  font-size: clamp(1.4rem, 3vw, 2.2rem);
+  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
   font-weight: 300;
   color: #18180f;
   margin: 0;
@@ -35,13 +35,19 @@
   position: relative;
 }
 
-.carouselOuter:hover .arrowOverlay:not(.arrowHidden) {
+/* always show right arrow; left arrow shows on hover when active */
+.carouselOuter .arrowRight:not(.arrowHidden) {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.carouselOuter:hover .arrowLeft:not(.arrowHidden) {
   opacity: 1;
   pointer-events: all;
 }
 
 /* ════════════════════════════════════════
-   ARROWS
+   OVERLAY ARROW BUTTONS
 ════════════════════════════════════════ */
 .arrowOverlay {
   position: absolute;
@@ -87,30 +93,25 @@
 
 /* ════════════════════════════════════════
    MASONRY GRID
-   — column-fill: auto fills columns top
-     to bottom before moving right, which
-     eliminates the blank space at the
-     bottom of short columns.
-   — height cap forces it to fill down
-     rather than spread evenly.
 ════════════════════════════════════════ */
 .track {
   columns: 4;
   column-gap: 12px;
-  column-fill: auto;          /* ← fills columns top-to-bottom, no gaps */
   display: block;
   overflow: visible;
-  padding-bottom: 24px;
+  padding-bottom: 20px;
 }
 
 /* ════════════════════════════════════════
-   PRODUCT CARD
+   PRODUCT CARD  — semi-vertical
 ════════════════════════════════════════ */
 .card {
   break-inside: avoid;
   -webkit-column-break-inside: avoid;
+
   width: 100%;
   margin-bottom: 12px;
+
   background: #ffffff;
   border-radius: 16px;
   border: 1px solid rgba(0, 0, 0, 0.06);
@@ -120,9 +121,8 @@
   transition: box-shadow 0.3s ease, transform 0.3s ease, border-color 0.3s ease;
   display: flex;
   flex-direction: column;
-  /* overflow: hidden removed from card — clipped buttons were caused by this
-     combined with the card hover transform. We clip only the image now. */
-  overflow: visible;
+  overflow: hidden;
+
   animation: cardIn 0.4s ease both;
 }
 
@@ -139,39 +139,57 @@
   border-color: rgba(0, 0, 0, 0.1);
 }
 
-/* ── Responsive column counts ── */
+/* ── responsive column counts ── */
 @media (max-width: 1199px) { .track { columns: 3; } }
 @media (max-width: 860px)  { .track { columns: 2; } }
 @media (max-width: 520px)  {
-  .track        { columns: 2; column-gap: 8px; }
-  .trackWrapper { padding: 0 12px; }
-  .header       { padding: 0 12px 16px; }
+  .track        { columns: 2; }
+  .trackWrapper { padding: 0 16px; }
+  .header       { padding: 0 16px 14px; }
 }
 
 /* ════════════════════════════════════════
    IMAGE AREA
-   overflow: hidden lives here now, not
-   on .card — so buttons are never clipped
+   Fixed semi-vertical ratio (4:5).
+   Shows top of image by default.
+   Click triggers .imgExpanded to show full.
 ════════════════════════════════════════ */
 .imgWrap {
   position: relative;
   width: 100%;
-  overflow: hidden;            /* clip only the image zoom */
+  aspect-ratio: 4 / 5;        /* semi-vertical — not fully portrait */
+  overflow: hidden;
   background: #ede8e0;
   border-radius: 16px 16px 0 0;
-  /* Clip the corners so the image doesn't bleed outside the card radius */
-  -webkit-mask-image: -webkit-radial-gradient(white, black);
-  mask-image: radial-gradient(white, black);
+  cursor: zoom-in;
+}
+
+/* expanded state — show full image, no clipping */
+.imgWrap.imgExpanded {
+  aspect-ratio: unset;
+  cursor: zoom-out;
 }
 
 .img {
   width: 100%;
-  height: auto;
+  height: 100%;
+  object-fit: cover;
+  object-position: top;       /* show top of image by default */
   display: block;
-  transition: transform 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  transition:
+    transform 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    height    0.4s  ease,
+    object-fit 0s;
 }
 
-.card:hover .img {
+/* expanded: let the image breathe at natural ratio */
+.imgWrap.imgExpanded .img {
+  height: auto;
+  object-fit: unset;
+  object-position: unset;
+}
+
+.card:hover .imgWrap:not(.imgExpanded) .img {
   transform: scale(1.04);
 }
 
@@ -194,22 +212,43 @@
   border-radius: 100px;
 }
 
+/* small expand hint icon in corner */
+.expandHint {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  z-index: 4;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.imgWrap:hover .expandHint {
+  opacity: 1;
+}
+
 /* ════════════════════════════════════════
    CARD INFO
 ════════════════════════════════════════ */
 .info {
-  padding: 12px 14px 14px;
+  padding: 14px 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 4px;
   flex: 1;
   background: #ffffff;
-  border-radius: 0 0 16px 16px;  /* match card radius now that card is overflow:visible */
 }
 
 .title {
   font-family: "Jost", sans-serif;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   font-weight: 500;
   color: #18180f;
   margin: 0;
@@ -219,13 +258,13 @@
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
-  line-clamp: 2;
+    line-clamp: 2;
   -webkit-box-orient: vertical;
 }
 
 .price {
   font-family: "Jost", sans-serif;
-  font-size: 0.85rem;
+  font-size: 0.88rem;
   font-weight: 600;
   color: #b5622a;
   margin: 0;
@@ -234,39 +273,29 @@
 
 /* ════════════════════════════════════════
    BUTTON GROUP
-   Key fixes:
-   - Remove white-space: nowrap so text
-     wraps on very narrow columns
-   - min-width: 0 lets flex children shrink
-   - font-size scales down on mobile
 ════════════════════════════════════════ */
 .btnGroup {
   display: flex;
-  gap: 6px;
-  margin-top: 10px;
-  flex-wrap: nowrap;      /* keep side by side */
-  min-width: 0;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .btnCart {
   flex: 1;
-  min-width: 0;           /* allow shrinking */
-  padding: 9px 8px;
+  padding: 10px 12px;
   background: #18180f;
   color: #f7f3ee;
   border: none;
   border-radius: 100px;
   font-family: "Jost", sans-serif;
-  font-size: 0.68rem;     /* slightly smaller so it fits narrow columns */
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
   transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
   white-space: nowrap;
   text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .btnCart:hover {
@@ -282,23 +311,20 @@
 
 .btnLearn {
   flex: 1;
-  min-width: 0;           /* allow shrinking */
-  padding: 9px 8px;
+  padding: 10px 12px;
   background: transparent;
   color: #18180f;
   border: 1.5px solid rgba(0, 0, 0, 0.16);
   border-radius: 100px;
   font-family: "Jost", sans-serif;
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
   white-space: nowrap;
   text-align: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .btnLearn:hover {
@@ -306,23 +332,4 @@
   color: #f7f3ee;
   border-color: #18180f;
   transform: translateY(-1px);
-}
-
-/* ════════════════════════════════════════
-   MOBILE — extra small screens
-   Stack buttons vertically so they never
-   overflow on very narrow 2-col layouts
-════════════════════════════════════════ */
-@media (max-width: 400px) {
-  .btnGroup {
-    flex-direction: column;
-    gap: 5px;
-  }
-
-  .btnCart,
-  .btnLearn {
-    width: 100%;
-    font-size: 0.65rem;
-    padding: 8px 6px;
-  }
 }

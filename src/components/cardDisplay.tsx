@@ -24,14 +24,13 @@ function shuffle<T>(arr: T[]): T[] {
   return a;
 }
 
-function ProductSection({ category, isFirst }: { category: Category; isFirst: boolean }) {
+function ProductSection({ category }: { category: Category }) {
   const [products, setProducts] = useState<Product[]>([]);
 
   useEffect(() => {
     const fetchProducts = async () => {
       const res = await fetch(`/api/products?category_id=${category.id}`);
       const data = (await res.json()) as ProductsResponse;
-      // shuffle products so order is random each visit
       setProducts(shuffle(data.results || []));
     };
 
@@ -40,7 +39,7 @@ function ProductSection({ category, isFirst }: { category: Category; isFirst: bo
 
   return (
     <section id={`category-${category.slug}`}>
-      <ProductCard title={category.name} products={products} isFirst={isFirst} />
+      <ProductCard title={category.name} products={products} />
     </section>
   );
 }
@@ -52,7 +51,6 @@ export default function ProductSections() {
     const fetchCategories = async () => {
       const res = await fetch("/api/categories");
       const data = (await res.json()) as CategoriesResponse;
-      // shuffle categories so section order is random each visit
       setCategories(shuffle(data.results || []));
     };
 
@@ -63,8 +61,8 @@ export default function ProductSections() {
 
   return (
     <div>
-      {categories.map((category, i) => (
-        <ProductSection key={category.id} category={category} isFirst={i === 0} />
+      {categories.map(category => (
+        <ProductSection key={category.id} category={category} />
       ))}
     </div>
   );
