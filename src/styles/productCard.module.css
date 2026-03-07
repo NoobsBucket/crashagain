@@ -3,7 +3,7 @@
 ════════════════════════════════════════ */
 .section {
   background: #f7f3ee;
-  padding: 28px 0 24px;        /* ← reduced from 56px/52px */
+  padding: 28px 0 24px;
   font-family: "Jost", "Helvetica Neue", sans-serif;
   overflow-x: hidden;
 }
@@ -15,7 +15,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 40px 16px;        /* ← reduced bottom padding */
+  padding: 0 40px 16px;
   gap: 16px;
 }
 
@@ -35,12 +35,11 @@
   position: relative;
 }
 
-/* always show right arrow; left arrow shows on hover when active */
+/* right arrow always visible; left shows on hover */
 .carouselOuter .arrowRight:not(.arrowHidden) {
   opacity: 1;
   pointer-events: all;
 }
-
 .carouselOuter:hover .arrowLeft:not(.arrowHidden) {
   opacity: 1;
   pointer-events: all;
@@ -85,32 +84,37 @@
 .arrowHidden { opacity: 0 !important; pointer-events: none !important; }
 
 /* ════════════════════════════════════════
-   TRACK WRAPPER
+   TRACK WRAPPER — clips the scroll area
 ════════════════════════════════════════ */
 .trackWrapper {
   padding: 0 40px;
+  overflow: hidden;           /* hide scrollbar, arrows handle nav */
 }
 
 /* ════════════════════════════════════════
-   MASONRY GRID
+   TRACK — horizontal flex scroll
 ════════════════════════════════════════ */
 .track {
-  columns: 4;
-  column-gap: 12px;
-  display: block;
-  overflow: visible;
-  padding-bottom: 20px;
+  display: flex;
+  flex-direction: row;
+  gap: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;          /* Firefox */
+  padding-bottom: 12px;
+}
+
+.track::-webkit-scrollbar {
+  display: none;                  /* Chrome/Safari */
 }
 
 /* ════════════════════════════════════════
-   PRODUCT CARD  — semi-vertical
+   PRODUCT CARD — fixed size, never shrinks
 ════════════════════════════════════════ */
 .card {
-  break-inside: avoid;
-  -webkit-column-break-inside: avoid;
-
-  width: 100%;
-  margin-bottom: 12px;
+  flex: 0 0 240px;               /* fixed width, never shrink or grow */
+  scroll-snap-align: start;
 
   background: #ffffff;
   border-radius: 16px;
@@ -139,32 +143,29 @@
   border-color: rgba(0, 0, 0, 0.1);
 }
 
-/* ── responsive column counts ── */
-@media (max-width: 1199px) { .track { columns: 3; } }
-@media (max-width: 860px)  { .track { columns: 2; } }
+/* ── responsive card widths ── */
+@media (max-width: 860px)  { .card { flex: 0 0 200px; } }
 @media (max-width: 520px)  {
-  .track        { columns: 2; }
+  .card         { flex: 0 0 160px; }
   .trackWrapper { padding: 0 16px; }
   .header       { padding: 0 16px 14px; }
 }
 
 /* ════════════════════════════════════════
    IMAGE AREA
-   Fixed semi-vertical ratio (4:5).
-   Shows top of image by default.
-   Click triggers .imgExpanded to show full.
+   Semi-vertical 4:5 ratio, top-cropped.
+   Click to expand full image.
 ════════════════════════════════════════ */
 .imgWrap {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 5;        /* semi-vertical — not fully portrait */
+  aspect-ratio: 4 / 5;
   overflow: hidden;
   background: #ede8e0;
   border-radius: 16px 16px 0 0;
   cursor: zoom-in;
 }
 
-/* expanded state — show full image, no clipping */
 .imgWrap.imgExpanded {
   aspect-ratio: unset;
   cursor: zoom-out;
@@ -174,7 +175,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  object-position: top;       /* show top of image by default */
+  object-position: top;
   display: block;
   transition:
     transform 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94),
@@ -182,7 +183,6 @@
     object-fit 0s;
 }
 
-/* expanded: let the image breathe at natural ratio */
 .imgWrap.imgExpanded .img {
   height: auto;
   object-fit: unset;
@@ -212,7 +212,6 @@
   border-radius: 100px;
 }
 
-/* small expand hint icon in corner */
 .expandHint {
   position: absolute;
   bottom: 10px;
