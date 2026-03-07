@@ -16,9 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "CrashCart",
-
 };
-
 export default function RootLayout({
   children,
 }: Readonly<{
