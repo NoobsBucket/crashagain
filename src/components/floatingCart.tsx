@@ -80,7 +80,7 @@ export default function FloatingCart() {
                     <div style={{ fontWeight: 600, fontSize: "0.9rem", marginBottom: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {item.name}
                     </div>
-                    <div style={{ color: "#c8824a", fontWeight: 700, fontSize: "0.9rem" }}>${item.price.toFixed(2)}</div>
+                    <div style={{ color: "#c8824a", fontWeight: 700, fontSize: "0.9rem" }}>RS {item.price.toFixed(2)}</div>
                   </div>
                   {/* Quantity controls */}
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
