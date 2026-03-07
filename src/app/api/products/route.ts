@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     const { DB } = await getEnv();
     const { searchParams } = new URL(req.url);
     const categoryId = searchParams.get("category_id");
-    const productId  = searchParams.get("id");
+    const productId = searchParams.get("id");
 
     if (productId) {
       const pr = await DB.prepare("SELECT * FROM products WHERE id = ?").bind(productId).all();
@@ -32,7 +32,9 @@ export async function GET(req: NextRequest) {
 
       const ir = await DB.prepare(
         "SELECT * FROM product_images WHERE product_id = ? ORDER BY sort_order ASC"
-      ).bind(productId).all();
+      )
+        .bind(productId)
+        .all();
 
       return NextResponse.json({ product: { ...product, images: ir.results ?? [] } });
     }
@@ -90,7 +92,9 @@ export async function POST(req: NextRequest) {
 
     const insertResult = await DB.prepare(
       "INSERT INTO products (name, price, description, category_id, image_url) VALUES (?, ?, ?, ?, ?)"
-    ).bind(name.trim(), Number(price), description.trim(), Number(category_id), firstImage).run();
+    )
+      .bind(name.trim(), Number(price), description.trim(), Number(category_id), firstImage)
+      .run();
 
     const productId = insertResult.meta?.last_row_id;
     if (!productId) throw new Error("Product insert did not return a valid ID");
@@ -98,16 +102,31 @@ export async function POST(req: NextRequest) {
     for (let i = 0; i < image_urls.length; i++) {
       await DB.prepare(
         "INSERT INTO product_images (product_id, image_url, sort_order) VALUES (?, ?, ?)"
-      ).bind(productId, image_urls[i], i).run();
+      )
+        .bind(productId, image_urls[i], i)
+        .run();
     }
 
     return NextResponse.json(
-      { success: true, product: { id: productId, name, price: Number(price), description, category_id: Number(category_id), image_url: firstImage } },
+      {
+        success: true,
+        product: {
+          id: productId,
+          name,
+          price: Number(price),
+          description,
+          category_id: Number(category_id),
+          image_url: firstImage,
+        },
+      },
       { status: 201 }
     );
   } catch (err: any) {
     console.error("[products] POST error:", err);
-    return NextResponse.json({ error: err?.message ?? "Failed to create product" }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message ?? "Failed to create product" },
+      { status: 500 }
+    );
   }
 }
 
@@ -132,11 +151,20 @@ export async function DELETE(req: NextRequest) {
     if (!existing.results?.length) {
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
     }
+
+    // 1. Delete reviews first
+    await DB.prepare("DELETE FROM reviews WHERE product_id = ?").bind(id).run();
+    // 2. Delete product images
     await DB.prepare("DELETE FROM product_images WHERE product_id = ?").bind(id).run();
+    // 3. Delete the product
     await DB.prepare("DELETE FROM products WHERE id = ?").bind(id).run();
+
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error("[products] DELETE error:", err);
-    return NextResponse.json({ error: err?.message ?? "Failed to delete product" }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message ?? "Failed to delete product" },
+      { status: 500 }
+    );
   }
 }

@@ -44,7 +44,7 @@ async function getDB(): Promise<D1Database> {
   return db;
 }
 
-// GET: Fetch all categories
+// ── GET: Fetch all categories ─────────────────────────────────────
 export async function GET() {
   try {
     const db = await getDB();
@@ -57,7 +57,7 @@ export async function GET() {
   }
 }
 
-// POST: Add a new category
+// ── POST: Add a new category ──────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
     const db = await getDB();
@@ -67,7 +67,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Please provide both name and slug" }, { status: 400 });
     }
 
-    const result = await db.prepare("INSERT INTO categories (name, slug) VALUES (?, ?)")
+    const result = await db
+      .prepare("INSERT INTO categories (name, slug) VALUES (?, ?)")
       .bind(name.trim(), slug.trim())
       .run();
 
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// DELETE: Remove a category by id
+// ── DELETE: Remove a category and all its products/images/reviews ─
 export async function DELETE(req: NextRequest) {
   try {
     const db = await getDB();
@@ -93,12 +94,29 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "A valid numeric id is required" }, { status: 400 });
     }
 
-    // Check it exists first
+    // Check category exists
     const existing = await db.prepare("SELECT id FROM categories WHERE id = ?").bind(numId).all();
     if (!existing.results.length) {
       return NextResponse.json({ error: "Category not found" }, { status: 404 });
     }
 
+    // 1. Get all products in this category
+    const productsRes = await db
+      .prepare("SELECT id FROM products WHERE category_id = ?")
+      .bind(numId)
+      .all();
+    const productIds = (productsRes.results as { id: number }[]).map((p) => p.id);
+
+    // 2. For each product, delete reviews and images first
+    for (const productId of productIds) {
+      await db.prepare("DELETE FROM reviews WHERE product_id = ?").bind(productId).run();
+      await db.prepare("DELETE FROM product_images WHERE product_id = ?").bind(productId).run();
+    }
+
+    // 3. Delete all products in the category
+    await db.prepare("DELETE FROM products WHERE category_id = ?").bind(numId).run();
+
+    // 4. Delete the category
     await db.prepare("DELETE FROM categories WHERE id = ?").bind(numId).run();
 
     return NextResponse.json({ success: true });

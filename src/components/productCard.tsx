@@ -113,7 +113,7 @@ export default function ProductCard({ title = "Featured Collection", products }:
                 {/* Info + always-visible buttons */}
                 <div className={style.info}>
                   <h3 className={style.title}>{p.name}</h3>
-                  <p className={style.price}>${p.price.toFixed(2)}</p>
+                  <p className={style.price}>RS {p.price.toFixed(2)}</p>
                   <div className={style.btnGroup}>
                     <button
                       className={`${style.btnCart} ${added[p.id] ? style.btnCartAdded : ""}`}
