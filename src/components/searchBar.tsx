@@ -140,7 +140,7 @@ export default function SearchBar() {
                 )}
               </div>
               <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "#c8824a", flexShrink: 0 }}>
-                ${product.price.toFixed(2)}
+                RS {product.price.toFixed(2)}
               </div>
             </div>
           ))}
