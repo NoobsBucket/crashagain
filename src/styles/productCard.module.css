@@ -32,11 +32,10 @@
   transform: none !important;
 }
 
-/* Compact variant for card row & lightbox top-right */
+/* Compact variant for card row & lightbox top actions */
 .shareBtnSm {
   padding: 5px 10px;
   font-size: 0.68rem;
-  /* Override the white/translucent colors to work on light card bg */
   color: rgba(24, 24, 15, 0.45) !important;
   border-color: rgba(24, 24, 15, 0.14) !important;
   background: transparent !important;
@@ -55,15 +54,15 @@
 }
 
 
-
-/* ── Lightbox top-right action cluster ── */
+/* ── Lightbox top action bar: Share LEFT, Close RIGHT ── */
 .lbTopActions {
   position: absolute;
   top: 14px;
+  left: 14px;
   right: 14px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
   z-index: 10;
 }
 
@@ -74,8 +73,8 @@
   gap: 10px;
   margin: 10px 0 4px;
   padding: 9px 12px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.07);
   border-radius: 10px;
   flex-wrap: wrap;
 }
@@ -83,14 +82,14 @@
 .lbShareUrl {
   flex: 1;
   font-size: 0.72rem;
-  color: rgba(255, 255, 255, 0.38);
+  color: rgba(24, 24, 15, 0.38);
   letter-spacing: 0.02em;
   word-break: break-all;
   font-family: monospace;
   min-width: 0;
 }
 
-/* ── Floating share badge on card image ── */
+/* ── Floating share badge on card image — ALWAYS VISIBLE ── */
 .cardShareBadge {
   position: absolute;
   top: 10px;
@@ -107,33 +106,21 @@
   justify-content: center;
   color: #18180f;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.13);
-  opacity: 0;
-  transform: scale(0.75);
-  transition:
-    opacity   0.2s ease,
-    transform 0.2s ease,
-    background 0.18s ease,
-    color      0.18s ease;
-  pointer-events: none;
-}
-
-.imgWrap:hover .cardShareBadge {
   opacity: 1;
   transform: scale(1);
   pointer-events: all;
+  transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
 }
 
 .cardShareBadge:hover {
   background: #18180f;
   color: #f7f3ee;
+  transform: scale(1.08);
 }
 
 .cardShareBadgeCopied {
   background: rgba(45, 122, 69, 0.88) !important;
   color: #fff !important;
-  opacity: 1 !important;
-  transform: scale(1) !important;
-  pointer-events: all !important;
 }
 
 /* ── Button group right cluster ── */
@@ -144,6 +131,9 @@
   flex-shrink: 0;
 }
 
+/* ════════════════════════════════════════
+   SECTION
+════════════════════════════════════════ */
 .section {
   background: #f7f3ee;
   padding: 56px 0 52px;
@@ -540,7 +530,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 32px 28px 28px;
+  padding: 60px 28px 28px;
   overflow-y: auto;
   gap: 6px;
 }
@@ -648,23 +638,21 @@
   border-color: #18180f;
 }
 
+/* close X button */
 .lbClose {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  z-index: 10;
   width: 34px;
   height: 34px;
   border-radius: 50%;
   border: none;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(0, 0, 0, 0.07);
   color: #18180f;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   transition: background 0.18s ease, transform 0.18s ease, color 0.18s ease;
+  flex-shrink: 0;
 }
 
 .lbClose:hover {
@@ -673,6 +661,7 @@
   transform: scale(1.08);
 }
 
+/* ── mobile ── */
 @media (max-width: 600px) {
   .lbBox {
     flex-direction: column;

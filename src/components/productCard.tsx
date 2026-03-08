@@ -87,7 +87,7 @@ function ShareButton({
   );
 }
 
-/* ── Image Share Badge (icon-only circle, floats on card image) ── */
+/* ── Image Share Badge (always-visible icon circle on card image) ── */
 function ImageShareBadge({
   productId,
   productName,
@@ -184,7 +184,7 @@ function Lightbox({
     <div className={style.lbOverlay} onClick={onClose}>
       <div className={style.lbBox} onClick={e => e.stopPropagation()}>
 
-        {/* top-right action cluster: share + close */}
+        {/* Share on LEFT, Close on RIGHT */}
         <div className={style.lbTopActions}>
           <ShareButton productId={product.id} productName={product.name} size="sm" />
           <button className={style.lbClose} onClick={onClose} aria-label="Close">
@@ -217,7 +217,6 @@ function Lightbox({
             <span className={style.lbShareUrl}>
               crashcart.shop/products/{product.id}
             </span>
-            <ShareButton productId={product.id} productName={product.name} />
           </div>
 
           <div className={style.lbDivider} />
@@ -375,7 +374,7 @@ export default function ProductCard({
                         </svg>
                       </div>
                     </div>
-                    {/* Floating share badge on image (top-right, appears on hover) */}
+                    {/* Always-visible share badge top-right of image */}
                     <ImageShareBadge productId={p.id} productName={p.name} />
                   </div>
 
