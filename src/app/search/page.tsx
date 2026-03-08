@@ -106,7 +106,7 @@ useEffect(() => {
                     {product.name}
                   </h3>
                   <p style={{ margin: "0 0 12px", fontSize: "1rem", fontWeight: 700, color: "#c8824a" }}>
-                    ${product.price.toFixed(2)}
+                    RS {product.price.toFixed(2)}
                   </p>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button
