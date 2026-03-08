@@ -15,6 +15,19 @@ type Order = { id: number; user_name: string; user_email: string; address: strin
 type Toast = { id: number; type: "success" | "error" | "info"; message: string };
 type ConfirmState = { open: boolean; message: string; onConfirm: () => void };
 
+/* ── Edit Product Modal State ── */
+type EditProductState = {
+  open: boolean;
+  product: Product | null;
+  name: string;
+  price: string;
+  description: string;
+  category_id: string;
+  newImages: File[];
+  newImagePreviews: string[];
+  saving: boolean;
+};
+
 const STATUS_META: Record<string, { color: string; bg: string; border: string }> = {
   pending: { color: "#e8a838", bg: "rgba(232,168,56,0.12)", border: "rgba(232,168,56,0.3)" },
   confirmed: { color: "#60a5fa", bg: "rgba(96,165,250,0.12)", border: "rgba(96,165,250,0.3)" },
@@ -65,6 +78,102 @@ export default function Admin() {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [uploading, setUploading] = useState(false);
+
+  /* ── Edit Product Modal ── */
+  const [editModal, setEditModal] = useState<EditProductState>({
+    open: false,
+    product: null,
+    name: "",
+    price: "",
+    description: "",
+    category_id: "",
+    newImages: [],
+    newImagePreviews: [],
+    saving: false,
+  });
+
+  const openEditModal = (product: Product) => {
+    setEditModal({
+      open: true,
+      product,
+      name: product.name,
+      price: String(product.price),
+      description: product.description || "",
+      category_id: String(product.category_id),
+      newImages: [],
+      newImagePreviews: [],
+      saving: false,
+    });
+  };
+
+  const closeEditModal = () => {
+    setEditModal(prev => ({ ...prev, open: false, newImages: [], newImagePreviews: [] }));
+  };
+
+  const handleEditImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    setEditModal(prev => ({
+      ...prev,
+      newImages: [...prev.newImages, ...files],
+      newImagePreviews: [...prev.newImagePreviews, ...files.map(f => URL.createObjectURL(f))],
+    }));
+  };
+
+  const removeEditImage = (index: number) => {
+    setEditModal(prev => ({
+      ...prev,
+      newImages: prev.newImages.filter((_, i) => i !== index),
+      newImagePreviews: prev.newImagePreviews.filter((_, i) => i !== index),
+    }));
+  };
+
+  const saveProductEdit = async () => {
+    if (!editModal.product) return;
+    if (!editModal.name.trim() || !editModal.price || !editModal.category_id) {
+      toast("error", "Please fill all required fields.");
+      return;
+    }
+    setEditModal(prev => ({ ...prev, saving: true }));
+    try {
+      let image_url = editModal.product.image_url;
+
+      // Upload new cover image if provided
+      if (editModal.newImages.length > 0) {
+        setUploadStep("Uploading new image…");
+        setUploadProgress(0);
+        image_url = await uploadImageWithProgress(editModal.newImages[0], pct => setUploadProgress(pct));
+        setUploadProgress(100);
+      }
+
+      const res = await fetch("/api/products", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editModal.product.id,
+          name: editModal.name.trim(),
+          price: parseFloat(editModal.price),
+          description: editModal.description.trim(),
+          category_id: parseInt(editModal.category_id),
+          image_url,
+        }),
+      });
+
+      if (res.ok) {
+        fetchProducts();
+        toast("success", `Product "${editModal.name.trim()}" updated successfully.`);
+        closeEditModal();
+      } else {
+        toast("error", "Failed to update product. Please try again.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast("error", "Update failed. Check your connection.");
+    } finally {
+      setEditModal(prev => ({ ...prev, saving: false }));
+      setUploadProgress(0);
+      setUploadStep("");
+    }
+  };
 
   /* ── Banners ── */
   const [bannerHeading, setBannerHeading] = useState("");
@@ -149,7 +258,6 @@ export default function Admin() {
     }
   };
 
-  // ── DELETE CATEGORY ──
   const deleteCategory = (id: number, name: string) => {
     askConfirm(`Delete category "${name}"? This cannot be undone.`, async () => {
       const res = await fetch("/api/categories", {
@@ -220,6 +328,15 @@ export default function Admin() {
       setUploadProgress(0);
       setUploadStep("");
     }
+  };
+
+  const copyProductLink = (id: number, name: string) => {
+    const url = `${window.location.origin}/product/${id}`;
+    navigator.clipboard.writeText(url).then(() => {
+      toast("success", `Link for "${name}" copied to clipboard.`);
+    }).catch(() => {
+      toast("error", "Failed to copy link.");
+    });
   };
 
   const deleteProduct = (id: number, name: string) => {
@@ -304,7 +421,7 @@ export default function Admin() {
     }
   };
 
-  const isUploading = uploading || bannerUploading;
+  const isUploading = uploading || bannerUploading || editModal.saving;
 
   return (
     <>
@@ -344,8 +461,118 @@ export default function Admin() {
         </div>
       )}
 
+      {/* ── Edit Product Modal ── */}
+      {editModal.open && (
+        <div className="edit-overlay" onClick={closeEditModal}>
+          <div className="edit-modal" onClick={e => e.stopPropagation()}>
+            {/* Modal Header */}
+            <div className="edit-modal__header">
+              <div className="edit-modal__header-left">
+                <div className="edit-modal__icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                </div>
+                <div>
+                  <h2 className="edit-modal__title">Edit Product</h2>
+                  <p className="edit-modal__subtitle">ID #{editModal.product?.id}</p>
+                </div>
+              </div>
+              <button className="edit-modal__close" onClick={closeEditModal}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="edit-modal__body">
+
+              {/* Current image + replace */}
+              <div className="edit-modal__img-section">
+                <div className="edit-modal__current-img-wrap">
+                  {editModal.newImagePreviews.length > 0 ? (
+                    <img src={editModal.newImagePreviews[0]} className="edit-modal__current-img" alt="" />
+                  ) : editModal.product?.image_url ? (
+                    <img src={editModal.product.image_url} className="edit-modal__current-img" alt="" />
+                  ) : (
+                    <div className="edit-modal__no-img">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" /></svg>
+                    </div>
+                  )}
+                  {editModal.newImagePreviews.length > 0 && (
+                    <button className="edit-modal__img-clear" onClick={() => setEditModal(prev => ({ ...prev, newImages: [], newImagePreviews: [] }))}>
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                    </button>
+                  )}
+                </div>
+                <div className="edit-modal__img-actions">
+                  <p className="edit-modal__img-label">
+                    {editModal.newImagePreviews.length > 0 ? "New image selected" : "Current image"}
+                  </p>
+                  <label className="adm-file-label" style={{ fontSize: "0.75rem", padding: "7px 14px" }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+                    Replace Image
+                    <input type="file" accept="image/*" onChange={handleEditImageSelect} style={{ display: "none" }} />
+                  </label>
+                  <p className="edit-modal__img-hint">Replaces the cover image</p>
+                </div>
+              </div>
+
+              <div className="adm-stack">
+                <div className="adm-row">
+                  <div className="adm-field">
+                    <label className="adm-label">Product Name</label>
+                    <input className="adm-input" placeholder="Product name" value={editModal.name}
+                      onChange={e => setEditModal(prev => ({ ...prev, name: e.target.value }))} />
+                  </div>
+                  <div className="adm-field">
+                    <label className="adm-label">Price (RS)</label>
+                    <input className="adm-input" type="number" placeholder="0.00" value={editModal.price}
+                      onChange={e => setEditModal(prev => ({ ...prev, price: e.target.value }))} />
+                  </div>
+                </div>
+                <div className="adm-field">
+                  <label className="adm-label">Description</label>
+                  <textarea className="adm-input adm-textarea" placeholder="Product description…" value={editModal.description}
+                    onChange={e => setEditModal(prev => ({ ...prev, description: e.target.value }))} />
+                </div>
+                <div className="adm-field">
+                  <label className="adm-label">Category</label>
+                  <select className="adm-input adm-select" value={editModal.category_id}
+                    onChange={e => setEditModal(prev => ({ ...prev, category_id: e.target.value }))}>
+                    <option value="">Select category</option>
+                    {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+                  </select>
+                </div>
+
+                {/* Upload progress inside modal */}
+                {editModal.saving && uploadStep && (
+                  <div className="adm-progress-wrap">
+                    <div className="adm-progress-header">
+                      <span className="adm-progress-step">{uploadStep}</span>
+                      <span className="adm-progress-pct">{uploadProgress}%</span>
+                    </div>
+                    <div className="adm-progress-track">
+                      <div className="adm-progress-fill" style={{ width: `${uploadProgress}%` }} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="edit-modal__footer">
+              <button className="adm-btn adm-btn--ghost" onClick={closeEditModal} disabled={editModal.saving}>Cancel</button>
+              <button className="adm-btn adm-btn--primary" onClick={saveProductEdit} disabled={editModal.saving}>
+                {editModal.saving
+                  ? <><span className="adm-spinner" />{uploadStep || "Saving…"}</>
+                  : <><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12" /></svg>Save Changes</>
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Upload Progress Bar ── */}
-      {isUploading && (
+      {isUploading && !editModal.open && (
         <div className="upload-bar-wrap">
           <div className="upload-bar-inner">
             <div className="upload-bar-header">
@@ -508,7 +735,7 @@ export default function Admin() {
               {products.length === 0 ? <p className="adm-empty">No products found.</p> : (
                 <div className="adm-table-wrap">
                   <table className="adm-table">
-                    <thead><tr><th>Image</th><th>Name</th><th>Price</th><th>Category</th><th></th></tr></thead>
+                    <thead><tr><th>Image</th><th>Name</th><th>Price</th><th>Category</th><th>Link</th><th></th></tr></thead>
                     <tbody>
                       {products.map(p => (
                         <tr key={p.id}>
@@ -516,7 +743,26 @@ export default function Admin() {
                           <td>{p.name}</td>
                           <td className="adm-price">RS {p.price}</td>
                           <td><span className="adm-cat-badge">{categories.find(c => c.id === p.category_id)?.name || "—"}</span></td>
-                          <td><button className="adm-btn adm-btn--danger adm-btn--sm" onClick={() => deleteProduct(p.id, p.name)}>Delete</button></td>
+                          <td>
+                            <div className="adm-link-cell">
+                              <code className="adm-product-link">/product/{p.id}</code>
+                              <button className="adm-link-copy-btn" title="Copy product link" onClick={() => copyProductLink(p.id, p.name)}>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
+                              </button>
+                              <a className="adm-link-open-btn" href={`/product/${p.id}`} target="_blank" rel="noopener noreferrer" title="Open product page">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+                              </a>
+                            </div>
+                          </td>
+                          <td>
+                            <div className="adm-action-btns">
+                              <button className="adm-btn adm-btn--edit adm-btn--sm" onClick={() => openEditModal(p)}>
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                                Edit
+                              </button>
+                              <button className="adm-btn adm-btn--danger adm-btn--sm" onClick={() => deleteProduct(p.id, p.name)}>Delete</button>
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -718,6 +964,8 @@ const css = `
     --text-3:      #545a66;
     --danger:      #f87171;
     --danger-dim:  rgba(248,113,113,0.12);
+    --edit:        #60a5fa;
+    --edit-dim:    rgba(96,165,250,0.12);
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -754,6 +1002,29 @@ const css = `
   .confirm-icon { width: 52px; height: 52px; border-radius: 50%; background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.25); display: flex; align-items: center; justify-content: center; color: var(--danger); margin: 0 auto 18px; }
   .confirm-msg { font-size: 0.9rem; color: var(--text-2); line-height: 1.65; margin-bottom: 24px; font-family: 'Jost', sans-serif; }
   .confirm-btns { display: flex; gap: 10px; justify-content: center; }
+
+  /* ── Edit Product Modal ── */
+  .edit-overlay { position: fixed; inset: 0; background: rgba(8,10,16,0.82); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 9990; display: flex; align-items: center; justify-content: center; padding: 20px; animation: fadeIn 0.2s ease both; }
+  .edit-modal { background: var(--surface); border: 1px solid var(--border-hi); border-radius: 22px; width: 100%; max-width: 560px; max-height: 90vh; display: flex; flex-direction: column; animation: popIn 0.28s cubic-bezier(.22,1,.36,1) both; box-shadow: 0 32px 80px rgba(0,0,0,0.6); overflow: hidden; }
+  .edit-modal__header { display: flex; align-items: center; justify-content: space-between; padding: 22px 26px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+  .edit-modal__header-left { display: flex; align-items: center; gap: 14px; }
+  .edit-modal__icon { width: 38px; height: 38px; border-radius: 10px; background: rgba(96,165,250,0.12); border: 1px solid rgba(96,165,250,0.25); display: flex; align-items: center; justify-content: center; color: var(--edit); flex-shrink: 0; }
+  .edit-modal__title { font-size: 1rem; font-weight: 600; color: var(--text); letter-spacing: -0.01em; }
+  .edit-modal__subtitle { font-size: 0.72rem; color: var(--text-3); margin-top: 2px; }
+  .edit-modal__close { width: 32px; height: 32px; border-radius: 8px; background: transparent; border: 1px solid var(--border); color: var(--text-3); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: color 0.15s, border-color 0.15s, background 0.15s; }
+  .edit-modal__close:hover { color: var(--text); border-color: var(--border-hi); background: var(--surface2); }
+  .edit-modal__body { overflow-y: auto; padding: 24px 26px; flex: 1; display: flex; flex-direction: column; gap: 20px; }
+  .edit-modal__footer { display: flex; justify-content: flex-end; gap: 10px; padding: 18px 26px; border-top: 1px solid var(--border); flex-shrink: 0; background: var(--surface); }
+
+  /* Image section inside modal */
+  .edit-modal__img-section { display: flex; align-items: flex-start; gap: 16px; padding: 16px; background: var(--surface2); border: 1px solid var(--border); border-radius: 14px; }
+  .edit-modal__current-img-wrap { position: relative; flex-shrink: 0; }
+  .edit-modal__current-img { width: 100px; height: 72px; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); display: block; }
+  .edit-modal__no-img { width: 100px; height: 72px; border-radius: 10px; border: 1px dashed var(--border-hi); display: flex; align-items: center; justify-content: center; color: var(--text-3); }
+  .edit-modal__img-clear { position: absolute; top: -8px; right: -8px; width: 20px; height: 20px; background: var(--danger); color: #fff; border: none; border-radius: 50%; font-size: 11px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .edit-modal__img-actions { display: flex; flex-direction: column; gap: 8px; }
+  .edit-modal__img-label { font-size: 0.78rem; font-weight: 500; color: var(--text-2); }
+  .edit-modal__img-hint { font-size: 0.68rem; color: var(--text-3); }
 
   .upload-bar-wrap { position: fixed; top: 62px; left: 0; right: 0; z-index: 200; background: rgba(15,17,23,0.92); border-bottom: 1px solid var(--border); padding: 10px 24px; backdrop-filter: blur(10px); }
   .upload-bar-inner { max-width: 1000px; margin: 0 auto; }
@@ -804,6 +1075,8 @@ const css = `
     .adm-stat   { flex: 1; }
     .toast-stack { right: 14px; left: 14px; align-items: stretch; }
     .toast       { min-width: unset; max-width: 100%; }
+    .edit-modal  { max-height: 95vh; border-radius: 18px; }
+    .edit-modal__img-section { flex-direction: column; }
   }
 
   .adm-field { display: flex; flex-direction: column; gap: 7px; }
@@ -825,12 +1098,21 @@ const css = `
   .adm-preview__badge { position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%); font-size: 0.6rem; background: var(--accent); color: #0f1117; padding: 2px 6px; border-radius: 100px; font-weight: 600; white-space: nowrap; }
   .adm-preview__remove { position: absolute; top: -7px; right: -7px; width: 20px; height: 20px; background: var(--danger); color: #fff; border: none; border-radius: 50%; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
 
+  .adm-link-cell { display: flex; align-items: center; gap: 6px; }
+  .adm-product-link { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 3px 8px; font-size: 0.72rem; color: var(--text-3); white-space: nowrap; letter-spacing: 0.02em; }
+  .adm-link-copy-btn, .adm-link-open-btn { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface2); color: var(--text-3); cursor: pointer; transition: color 0.15s, border-color 0.15s, background 0.15s; flex-shrink: 0; text-decoration: none; }
+  .adm-link-copy-btn:hover { color: var(--accent); border-color: rgba(124,158,135,0.4); background: var(--accent-dim); }
+  .adm-link-open-btn:hover { color: var(--edit); border-color: rgba(96,165,250,0.4); background: var(--edit-dim); }
+
+  .adm-action-btns { display: flex; gap: 6px; align-items: center; }
   .adm-btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 22px; border: none; border-radius: 100px; font-family: 'Jost', sans-serif; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.06em; cursor: pointer; transition: opacity 0.18s, transform 0.18s, box-shadow 0.18s; white-space: nowrap; }
   .adm-btn:hover:not(:disabled) { opacity: 0.82; transform: translateY(-1px); }
   .adm-btn:disabled { opacity: 0.45; cursor: not-allowed; }
   .adm-btn--primary { background: var(--accent); color: #0f1117; }
   .adm-btn--primary:hover:not(:disabled) { box-shadow: 0 6px 20px var(--accent-glow); }
   .adm-btn--danger  { background: var(--danger-dim); color: var(--danger); border: 1px solid rgba(248,113,113,0.2); }
+  .adm-btn--edit    { background: var(--edit-dim); color: var(--edit); border: 1px solid rgba(96,165,250,0.2); }
+  .adm-btn--edit:hover:not(:disabled) { box-shadow: 0 4px 14px rgba(96,165,250,0.15); }
   .adm-btn--ghost   { background: transparent; color: var(--text-2); border: 1px solid var(--border-hi); }
   .adm-btn--ghost:hover:not(:disabled) { color: var(--text); border-color: var(--text-2); }
   .adm-btn--sm { padding: 6px 14px; font-size: 0.72rem; }

@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     const { DB } = await getEnv();
     const { searchParams } = new URL(req.url);
     const categoryId = searchParams.get("category_id");
-    const productId = searchParams.get("id");
+    const productId  = searchParams.get("id");
 
     if (productId) {
       const pr = await DB.prepare("SELECT * FROM products WHERE id = ?").bind(productId).all();
@@ -60,8 +60,6 @@ export async function GET(req: NextRequest) {
 }
 
 // ── POST ─────────────────────────────────────────────────────────
-// Accepts JSON body: { name, price, description, category_id, image_urls: string[] }
-// Images are already uploaded to R2 by the client before calling this endpoint.
 export async function POST(req: NextRequest) {
   try {
     const { DB } = await getEnv();
@@ -75,18 +73,14 @@ export async function POST(req: NextRequest) {
 
     const { name, price, description = "", category_id, image_urls } = body;
 
-    if (!name?.trim()) {
+    if (!name?.trim())
       return NextResponse.json({ error: "name is required" }, { status: 400 });
-    }
-    if (!price || isNaN(Number(price)) || Number(price) <= 0) {
+    if (!price || isNaN(Number(price)) || Number(price) <= 0)
       return NextResponse.json({ error: "A valid positive price is required" }, { status: 400 });
-    }
-    if (!category_id || isNaN(Number(category_id))) {
+    if (!category_id || isNaN(Number(category_id)))
       return NextResponse.json({ error: "category_id is required" }, { status: 400 });
-    }
-    if (!Array.isArray(image_urls) || image_urls.length === 0) {
+    if (!Array.isArray(image_urls) || image_urls.length === 0)
       return NextResponse.json({ error: "At least one image_url is required" }, { status: 400 });
-    }
 
     const firstImage = image_urls[0];
 
@@ -123,8 +117,102 @@ export async function POST(req: NextRequest) {
     );
   } catch (err: any) {
     console.error("[products] POST error:", err);
+    return NextResponse.json({ error: err?.message ?? "Failed to create product" }, { status: 500 });
+  }
+}
+
+// ── PATCH ─────────────────────────────────────────────────────────
+// Accepts JSON body: { id, name, price, description, category_id, image_url? }
+// image_url is optional — only updated if provided.
+export async function PATCH(req: NextRequest) {
+  try {
+    const { DB } = await getEnv();
+
+    let body: any;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const { id, name, price, description, category_id, image_url } = body;
+
+    // ── Validate ──
+    const numId = Number(id);
+    if (!numId || isNaN(numId))
+      return NextResponse.json({ error: "A valid numeric id is required" }, { status: 400 });
+    if (!name?.trim())
+      return NextResponse.json({ error: "name is required" }, { status: 400 });
+    if (!price || isNaN(Number(price)) || Number(price) <= 0)
+      return NextResponse.json({ error: "A valid positive price is required" }, { status: 400 });
+    if (!category_id || isNaN(Number(category_id)))
+      return NextResponse.json({ error: "category_id is required" }, { status: 400 });
+
+    // ── Check product exists ──
+    const existing = await DB.prepare("SELECT id, image_url FROM products WHERE id = ?")
+      .bind(numId)
+      .all();
+    if (!existing.results?.length)
+      return NextResponse.json({ error: "Product not found" }, { status: 404 });
+
+    const currentImageUrl = existing.results[0].image_url;
+    const newImageUrl     = image_url ?? currentImageUrl;
+
+    // ── Update products table ──
+    await DB.prepare(
+      `UPDATE products
+       SET name = ?, price = ?, description = ?, category_id = ?, image_url = ?
+       WHERE id = ?`
+    )
+      .bind(
+        name.trim(),
+        Number(price),
+        description?.trim() ?? "",
+        Number(category_id),
+        newImageUrl,
+        numId
+      )
+      .run();
+
+    // ── If a new image was provided, also update product_images cover slot ──
+    if (image_url && image_url !== currentImageUrl) {
+      // Update sort_order = 0 row if it exists, otherwise insert
+      const coverRow = await DB.prepare(
+        "SELECT id FROM product_images WHERE product_id = ? AND sort_order = 0"
+      )
+        .bind(numId)
+        .all();
+
+      if (coverRow.results?.length) {
+        await DB.prepare(
+          "UPDATE product_images SET image_url = ? WHERE product_id = ? AND sort_order = 0"
+        )
+          .bind(image_url, numId)
+          .run();
+      } else {
+        await DB.prepare(
+          "INSERT INTO product_images (product_id, image_url, sort_order) VALUES (?, ?, 0)"
+        )
+          .bind(numId, image_url)
+          .run();
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      product: {
+        id: numId,
+        name: name.trim(),
+        price: Number(price),
+        description: description?.trim() ?? "",
+        category_id: Number(category_id),
+        image_url: newImageUrl,
+      },
+    });
+  } catch (err: any) {
+    console.error("[products] PATCH error:", err);
     return NextResponse.json(
-      { error: err?.message ?? "Failed to create product" },
+      { error: err?.message ?? "Failed to update product" },
       { status: 500 }
     );
   }
@@ -143,14 +231,12 @@ export async function DELETE(req: NextRequest) {
     }
 
     const id = Number(body?.id);
-    if (!id || isNaN(id)) {
+    if (!id || isNaN(id))
       return NextResponse.json({ error: "A valid numeric id is required" }, { status: 400 });
-    }
 
     const existing = await DB.prepare("SELECT id FROM products WHERE id = ?").bind(id).all();
-    if (!existing.results?.length) {
+    if (!existing.results?.length)
       return NextResponse.json({ error: "Product not found" }, { status: 404 });
-    }
 
     // 1. Delete reviews first
     await DB.prepare("DELETE FROM reviews WHERE product_id = ?").bind(id).run();

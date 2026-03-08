@@ -1,6 +1,149 @@
-/* ════════════════════════════════════════
-   SECTION
-════════════════════════════════════════ */
+/* ── Share button (card + lightbox) ── */
+.shareBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: color 0.18s, border-color 0.18s, background 0.18s, transform 0.18s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.shareBtn:hover {
+  color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.09);
+  transform: translateY(-1px);
+}
+
+/* Copied state — green tint */
+.shareBtnCopied {
+  color: #7c9e87 !important;
+  border-color: rgba(124, 158, 135, 0.45) !important;
+  background: rgba(124, 158, 135, 0.12) !important;
+  transform: none !important;
+}
+
+/* Compact variant for card row & lightbox top-right */
+.shareBtnSm {
+  padding: 5px 10px;
+  font-size: 0.68rem;
+  /* Override the white/translucent colors to work on light card bg */
+  color: rgba(24, 24, 15, 0.45) !important;
+  border-color: rgba(24, 24, 15, 0.14) !important;
+  background: transparent !important;
+}
+
+.shareBtnSm:hover {
+  color: rgba(24, 24, 15, 0.9) !important;
+  border-color: rgba(24, 24, 15, 0.3) !important;
+  background: rgba(24, 24, 15, 0.05) !important;
+}
+
+.shareBtnSm.shareBtnCopied {
+  color: #2d7a45 !important;
+  border-color: rgba(45, 122, 69, 0.35) !important;
+  background: rgba(45, 122, 69, 0.07) !important;
+}
+
+
+
+/* ── Lightbox top-right action cluster ── */
+.lbTopActions {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 10;
+}
+
+/* ── Share URL row inside lightbox info panel ── */
+.lbShareRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 4px;
+  padding: 9px 12px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 10px;
+  flex-wrap: wrap;
+}
+
+.lbShareUrl {
+  flex: 1;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.38);
+  letter-spacing: 0.02em;
+  word-break: break-all;
+  font-family: monospace;
+  min-width: 0;
+}
+
+/* ── Floating share badge on card image ── */
+.cardShareBadge {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 5;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #18180f;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.13);
+  opacity: 0;
+  transform: scale(0.75);
+  transition:
+    opacity   0.2s ease,
+    transform 0.2s ease,
+    background 0.18s ease,
+    color      0.18s ease;
+  pointer-events: none;
+}
+
+.imgWrap:hover .cardShareBadge {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: all;
+}
+
+.cardShareBadge:hover {
+  background: #18180f;
+  color: #f7f3ee;
+}
+
+.cardShareBadgeCopied {
+  background: rgba(45, 122, 69, 0.88) !important;
+  color: #fff !important;
+  opacity: 1 !important;
+  transform: scale(1) !important;
+  pointer-events: all !important;
+}
+
+/* ── Button group right cluster ── */
+.btnGroupRight {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .section {
   background: #f7f3ee;
   padding: 56px 0 52px;
@@ -103,9 +246,7 @@
 .track::-webkit-scrollbar { display: none; }
 
 /* ════════════════════════════════════════
-   PRODUCT CARD — semi-vertical
-   Narrower cards (5 visible on desktop)
-   so the 3/4 portrait ratio looks natural.
+   PRODUCT CARD
 ════════════════════════════════════════ */
 .card {
   flex: 0 0 calc((100vw - 80px - 4 * 12px) / 5);
@@ -150,9 +291,7 @@
 }
 
 /* ════════════════════════════════════════
-   IMAGE AREA — 3/4 portrait ratio
-   overflow:hidden only here so card
-   buttons below are never clipped.
+   IMAGE AREA
 ════════════════════════════════════════ */
 .imgWrap {
   position: relative;
@@ -176,7 +315,6 @@
   transform: scale(1.05);
 }
 
-/* zoom hint that appears on image hover */
 .zoomHint {
   position: absolute;
   inset: 0;
@@ -275,6 +413,7 @@
 ════════════════════════════════════════ */
 .btnGroup {
   display: flex;
+  align-items: center;
   gap: 6px;
   margin-top: 10px;
   min-width: 0;
@@ -362,7 +501,6 @@
   to   { opacity: 1; }
 }
 
-/* ── lightbox box: image left, info right ── */
 .lbBox {
   position: relative;
   background: #ffffff;
@@ -382,7 +520,6 @@
   to   { opacity: 1; transform: translateY(0)    scale(1);    }
 }
 
-/* image takes 55% of width, shown fully (object-fit: contain) */
 .lbImgWrap {
   flex: 0 0 55%;
   background: #ede8e0;
@@ -399,7 +536,6 @@
   display: block;
 }
 
-/* info panel */
 .lbInfo {
   flex: 1;
   display: flex;
@@ -512,7 +648,6 @@
   border-color: #18180f;
 }
 
-/* close X button */
 .lbClose {
   position: absolute;
   top: 14px;
@@ -538,7 +673,6 @@
   transform: scale(1.08);
 }
 
-/* ── mobile: stack image on top, info below ── */
 @media (max-width: 600px) {
   .lbBox {
     flex-direction: column;

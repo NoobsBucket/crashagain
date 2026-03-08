@@ -5,6 +5,8 @@ import { createPortal } from "react-dom";
 import style from "../styles/productCard.module.css";
 import { useCart } from "./CartContext";
 
+const DOMAIN = "https://crashcart.shop";
+
 type Product = {
   id: number;
   name: string;
@@ -20,6 +22,124 @@ type Props = {
   isFirst?: boolean;
 };
 
+/* ── Share Button ────────────────────────────────────────────── */
+function ShareButton({
+  productId,
+  productName,
+  size = "md",
+}: {
+  productId: number;
+  productName: string;
+  size?: "sm" | "md";
+}) {
+  const [state, setState] = useState<"idle" | "copied">("idle");
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleShare = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const url = `${DOMAIN}/products/${productId}`;
+
+    if (navigator.share) {
+      navigator.share({ title: productName, url }).catch(() => {});
+      return;
+    }
+
+    navigator.clipboard.writeText(url).then(() => {
+      setState("copied");
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setState("idle"), 2000);
+    });
+  };
+
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  const isSm = size === "sm";
+
+  return (
+    <button
+      className={`${style.shareBtn} ${isSm ? style.shareBtnSm : ""} ${state === "copied" ? style.shareBtnCopied : ""}`}
+      onClick={handleShare}
+      title="Copy share link"
+      aria-label="Share product"
+    >
+      {state === "copied" ? (
+        <>
+          <svg width={isSm ? 11 : 13} height={isSm ? 11 : 13} viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.8" strokeLinecap="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          <span className={style.shareBtnLabel}>Copied!</span>
+        </>
+      ) : (
+        <>
+          <svg width={isSm ? 11 : 13} height={isSm ? 11 : 13} viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+            <circle cx="18" cy="5" r="3" />
+            <circle cx="6"  cy="12" r="3" />
+            <circle cx="18" cy="19" r="3" />
+            <line x1="8.59"  y1="13.51" x2="15.42" y2="17.49" />
+            <line x1="15.41" y1="6.51"  x2="8.59"  y2="10.49" />
+          </svg>
+          <span className={style.shareBtnLabel}>Share</span>
+        </>
+      )}
+    </button>
+  );
+}
+
+/* ── Image Share Badge (icon-only circle, floats on card image) ── */
+function ImageShareBadge({
+  productId,
+  productName,
+}: {
+  productId: number;
+  productName: string;
+}) {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleShare = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const url = `${DOMAIN}/products/${productId}`;
+    if (navigator.share) {
+      navigator.share({ title: productName, url }).catch(() => {});
+      return;
+    }
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
+  return (
+    <button
+      className={`${style.cardShareBadge} ${copied ? style.cardShareBadgeCopied : ""}`}
+      onClick={handleShare}
+      title="Copy share link"
+      aria-label="Share product"
+    >
+      {copied ? (
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2.8" strokeLinecap="round">
+          <polyline points="20 6 9 17 4 12" />
+        </svg>
+      ) : (
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+          <circle cx="18" cy="5" r="3" />
+          <circle cx="6"  cy="12" r="3" />
+          <circle cx="18" cy="19" r="3" />
+          <line x1="8.59"  y1="13.51" x2="15.42" y2="17.49" />
+          <line x1="15.41" y1="6.51"  x2="8.59"  y2="10.49" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 /* ── Lightbox ────────────────────────────────────────────────── */
 type LbState = { open: boolean; product: Product | null };
 
@@ -34,7 +154,6 @@ function Lightbox({
   const { addToCart } = useCart();
   const [added, setAdded] = useState(false);
 
-  // close on Escape
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
@@ -62,24 +181,22 @@ function Lightbox({
   };
 
   return createPortal(
-    <div
-      className={style.lbOverlay}
-      onClick={onClose}          /* click outside → close */
-    >
-      <div
-        className={style.lbBox}
-        onClick={e => e.stopPropagation()}   /* click inside → don't close */
-      >
-        {/* close button */}
-        <button className={style.lbClose} onClick={onClose} aria-label="Close">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-            <line x1="18" y1="6" x2="6"  y2="18" />
-            <line x1="6"  y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+    <div className={style.lbOverlay} onClick={onClose}>
+      <div className={style.lbBox} onClick={e => e.stopPropagation()}>
 
-        {/* full image — object-fit: contain so nothing is cropped */}
+        {/* top-right action cluster: share + close */}
+        <div className={style.lbTopActions}>
+          <ShareButton productId={product.id} productName={product.name} size="sm" />
+          <button className={style.lbClose} onClick={onClose} aria-label="Close">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6"  y2="18" />
+              <line x1="6"  y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+
+        {/* full image */}
         <div className={style.lbImgWrap}>
           <img
             src={product.image_url || "https://placehold.co/600x800?text=No+Image"}
@@ -94,6 +211,14 @@ function Lightbox({
 
           <h2 className={style.lbTitle}>{product.name}</h2>
           <p className={style.lbPrice}>RS {product.price.toFixed(2)}</p>
+
+          {/* share link row */}
+          <div className={style.lbShareRow}>
+            <span className={style.lbShareUrl}>
+              crashcart.shop/products/{product.id}
+            </span>
+            <ShareButton productId={product.id} productName={product.name} />
+          </div>
 
           <div className={style.lbDivider} />
 
@@ -250,6 +375,8 @@ export default function ProductCard({
                         </svg>
                       </div>
                     </div>
+                    {/* Floating share badge on image (top-right, appears on hover) */}
+                    <ImageShareBadge productId={p.id} productName={p.name} />
                   </div>
 
                   {/* Info + buttons */}
@@ -257,18 +384,23 @@ export default function ProductCard({
                     <h3 className={style.title}>{p.name}</h3>
                     <p className={style.price}>RS {p.price.toFixed(2)}</p>
                     <div className={style.btnGroup}>
-                      <button
-                        className={`${style.btnCart} ${added[p.id] ? style.btnCartAdded : ""}`}
-                        onClick={e => handleAdd(e, p)}
-                      >
-                        {added[p.id] ? "✓ Added" : "Add to Cart"}
-                      </button>
-                      <button
-                        className={style.btnLearn}
-                        onClick={e => { e.stopPropagation(); router.push(`/products/${p.id}`); }}
-                      >
-                        Details
-                      </button>
+                      {/* Share anchored to the LEFT */}
+                      <ShareButton productId={p.id} productName={p.name} size="sm" />
+                      {/* Cart + Details pushed to the RIGHT */}
+                      <div className={style.btnGroupRight}>
+                        <button
+                          className={`${style.btnCart} ${added[p.id] ? style.btnCartAdded : ""}`}
+                          onClick={e => handleAdd(e, p)}
+                        >
+                          {added[p.id] ? "✓ Added" : "Add to Cart"}
+                        </button>
+                        <button
+                          className={style.btnLearn}
+                          onClick={e => { e.stopPropagation(); router.push(`/products/${p.id}`); }}
+                        >
+                          Details
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </article>
@@ -279,7 +411,6 @@ export default function ProductCard({
         </div>
       </section>
 
-      {/* Lightbox — rendered via portal so it's always on top */}
       {lb.open && lb.product && (
         <Lightbox
           product={lb.product}
